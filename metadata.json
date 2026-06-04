@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Dashboard Monitoring Proyek",
+  "description": "Dashboard interaktif real-time untuk memonitor data BOQ, material, jasa, dan keuangan proyek yang terintegrasi dengan Google Sheets menggunakan Google Apps Script.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
