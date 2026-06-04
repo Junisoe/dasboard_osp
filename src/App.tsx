@@ -45,11 +45,16 @@ export default function App() {
   });
 
   const [apiUrl, setApiUrl] = useState<string>(() => {
-    return localStorage.getItem("gas_api_url") || "";
+    const saved = localStorage.getItem("gas_api_url");
+    if (saved === "") return "";
+    return saved || "https://docs.google.com/spreadsheets/d/1gZ6b5f6W-Bpe5pl-Ua7vfoYIM_WHwWa5pUGou7NjlRI/edit?usp=sharing";
   });
 
   const [isLive, setIsLive] = useState<boolean>(() => {
-    return localStorage.getItem("gas_is_live") === "true";
+    const savedIsLive = localStorage.getItem("gas_is_live");
+    if (savedIsLive === "false") return false;
+    if (savedIsLive === "true") return true;
+    return true; // Default to true so it loads automatically on boot
   });
 
   const [isLoading, setIsLoading] = useState(false);
