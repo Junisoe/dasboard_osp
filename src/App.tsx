@@ -8,6 +8,7 @@ import MonthlyCharts from "./components/MonthlyCharts";
 import ProjectTable from "./components/ProjectTable";
 import { LayoutDashboard, CloudLightning, FileSpreadsheet, RefreshCw, Layers, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { parseCSVDirect, transformCSVRowsDirect } from "./utils/sheetParser";
 
 export default function App() {
   const [data, setData] = useState<ProjectData[]>(() => {
@@ -69,7 +70,129 @@ export default function App() {
     setSyncSuccess(false);
 
     try {
-      // Fetching via the backend server-side proxy to bypass browser CORS blockers
+      // 1. Try DIRECT browser-side CSV fetching if it is a Google Spreadsheet URL to bypass server proxy limits (critical for Static & Remix deploys)
+      let spreadsheetId = "";
+      if (url.includes("google.com/spreadsheets")) {
+        const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        if (match && match[1]) {
+          spreadsheetId = match[1];
+        }
+      } else if (url.match(/^[a-zA-Z0-9-_]{40,50}$/)) {
+        spreadsheetId = url.trim();
+      }
+
+      if (spreadsheetId) {
+        console.log(`[App] Trying direct browser fetch for Google Spreadsheet ID: ${spreadsheetId}`);
+        const gidMatch = url.match(/[?&]gid=([0-9]+)/);
+        const gid = gidMatch ? gidMatch[1] : null;
+
+        const sheetMatch = url.match(/[?&]sheet=([^&]+)/);
+        const sheetName = sheetMatch ? decodeURIComponent(sheetMatch[1]) : null;
+
+        const potentialUrls: string[] = [];
+        if (gid) {
+          potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`);
+        }
+        if (sheetName) {
+          potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`);
+        }
+        potentialUrls.push(
+          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv`,
+          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=Sheet1`,
+          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=REKAP`,
+          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=DATA`,
+          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=PROYEK`,
+          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=Laporan`
+        );
+
+        let success = false;
+        let lastError = "";
+        let parsedRows: any[] = [];
+
+        for (const csvUrl of potentialUrls) {
+          try {
+            const csvResponse = await fetch(csvUrl);
+            if (!csvResponse.ok) {
+              if (csvResponse.status === 401 || csvResponse.status === 403) {
+                lastError = "PRIVATE_SHEET";
+              }
+              continue;
+            }
+            const text = await csvResponse.text();
+            const trimmed = text.trim();
+            const isHtml = trimmed.startsWith("<") || trimmed.includes("<!DOCTYPE") || trimmed.includes("html") || trimmed.includes("google-signin") || trimmed.includes("ServiceLogin");
+            
+            if (isHtml) {
+              lastError = "PRIVATE_SHEET";
+              continue;
+            }
+
+            const rows = parseCSVDirect(text);
+            if (rows.length > 0) {
+              const mapped = transformCSVRowsDirect(rows);
+              if (mapped.length > 0) {
+                parsedRows = mapped;
+                success = true;
+                break;
+              } else {
+                lastError = "Format kolom header sheet tidak sesuai (tidak ditemukan BLN, JENIS, PEKERJAAN, dll). Pastikan kolom header berada di baris pertama.";
+              }
+            }
+          } catch (e: any) {
+            lastError = "PRIVATE_SHEET";
+          }
+        }
+
+        if (success) {
+          const mappedProjects: ProjectData[] = parsedRows.map((row, idx) => {
+            const pekerjaan = String(row.pekerjaan || "DKU").toUpperCase();
+            const isMhr = pekerjaan === "MHR";
+            const material = Number(row.material) || 0;
+            const jasa = Number(row.jasa) || 0;
+            const sitac = Number(row.sitac) || 0;
+            const jumlah = material + jasa;
+            return {
+              id: row.id || String(idx + 1),
+              bln: String(row.bln || "MEI").toUpperCase(),
+              jenis: String(row.jenis || "RECOVERY").toUpperCase(),
+              pekerjaan: pekerjaan,
+              boq: String(row.boq || "OSP LAMA").toUpperCase(),
+              status: String(row.status || "BERKAS DONE").toUpperCase(),
+              namaLop: String(row.namaLop || `LOP ${idx + 1}`),
+              material: material,
+              jasa: jasa,
+              sitac: sitac,
+              jumlah: jumlah,
+              panjar60: isMhr ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
+              panjarSitac: isMhr ? (Number(row.panjarSitac) || sitac) : 0,
+              pelunasan15: isMhr ? (Number(row.pelunasan15) || Math.round(jumlah * 0.15)) : 0,
+              pendapatanMaharani: isMhr ? (Number(row.pendapatanMaharani) || Math.round(jumlah * 0.25)) : 0,
+              tanggalPanjar: String(row.tanggalPanjar || "")
+            };
+          });
+
+          setData(mappedProjects);
+          setApiUrl(url);
+          setIsLive(true);
+          setErrorMsg(null);
+          setSyncSuccess(true);
+          setShowConfig(false);
+          
+          localStorage.setItem("gas_api_url", url);
+          localStorage.setItem("gas_is_live", "true");
+          localStorage.removeItem("simulated_lop_data");
+          setTimeout(() => setSyncSuccess(false), 3000);
+          return true;
+        } else {
+          if (lastError === "PRIVATE_SHEET") {
+            throw new Error("File Google Spreadsheet Anda bersifat privat atau memerlukan login. Silakan klik tombol 'Bagikan' (Share) di pojok kanan atas spreadsheet Anda, ubah Akses Umum menjadi 'Siapa saja yang memiliki link' (Anyone with the link) sebagai Pengakses Lihat (Viewer), lalu coba hubungkan kembali.");
+          } else {
+            throw new Error(lastError || "Gagal memuat Google Spreadsheet secara langsung.");
+          }
+        }
+      }
+
+      // 2. Fallback to server-side proxy for API / Google Apps Script URLs
       const proxyUrl = `/api/sheets-proxy?url=${encodeURIComponent(url)}`;
       const response = await fetch(proxyUrl);
       
@@ -88,14 +211,13 @@ export default function App() {
         throw new Error("Google Spreadsheet tersambung, tetapi tidak memiliki baris data proyek untuk diproses.");
       }
 
-      // Map spreadsheet entries safely to typed structure
       const mappedProjects: ProjectData[] = incomingData.map((row, idx) => {
         const pekerjaan = String(row.pekerjaan || "DKU").toUpperCase();
         const isMhr = pekerjaan === "MHR";
         const material = Number(row.material) || 0;
         const jasa = Number(row.jasa) || 0;
         const sitac = Number(row.sitac) || 0;
-        const jumlah = material + jasa; // Total BOQ: Material + Jasa
+        const jumlah = material + jasa;
         return {
           id: row.id || String(idx + 1),
           bln: String(row.bln || "MEI").toUpperCase(),
@@ -116,7 +238,6 @@ export default function App() {
         };
       });
 
-      // Update state & persist configuration configuration
       setData(mappedProjects);
       setApiUrl(url);
       setIsLive(true);
@@ -126,14 +247,17 @@ export default function App() {
       
       localStorage.setItem("gas_api_url", url);
       localStorage.setItem("gas_is_live", "true");
-      // Remove simulated data when switching to live Sheet
       localStorage.removeItem("simulated_lop_data");
 
       setTimeout(() => setSyncSuccess(false), 3000);
       return true;
     } catch (err: any) {
       console.error(err);
-      setErrorMsg(`Koneksi Gagal: ${err.message || "Gagal menghubungi Apps Script Web App. Pastikan URL benar dan izin akses diatur ke 'Anyone'."}`);
+      let errMsg = err.message || "";
+      if (errMsg.includes("Unexpected token") || errMsg.includes("is not valid JSON") || errMsg.includes("Failed to fetch")) {
+        errMsg = "File Google Spreadsheet Anda bersifat privat atau memerlukan login. Silakan klik tombol 'Bagikan' (Share) di pojok kanan atas spreadsheet Anda, ubah Akses Umum menjadi 'Siapa saja yang memiliki link' (Anyone with the link) sebagai Pengakses Lihat (Viewer), lalu coba hubungkan kembali.";
+      }
+      setErrorMsg(`Koneksi Gagal: ${errMsg}`);
       return false;
     } finally {
       setIsLoading(false);
