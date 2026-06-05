@@ -10,7 +10,8 @@ async function startServer() {
 
   // Google Sheets Proxy API to bypass CORS
   app.get("/api/sheets-proxy", async (req, res) => {
-    const { url } = req.query;
+    const { url, raw } = req.query;
+    const isRaw = raw === "true";
 
     if (!url || typeof url !== "string") {
       res.status(400).json({ error: "Missing 'url' parameter" });
@@ -18,7 +19,7 @@ async function startServer() {
     }
 
     try {
-      console.log(`[Proxy] Fetching Google Sheets URL: ${url}`);
+      console.log(`[Proxy] Fetching Google Sheets URL: ${url} (raw=${isRaw})`);
 
       let spreadsheetId = "";
       if (url.includes("google.com/spreadsheets")) {
@@ -43,26 +44,38 @@ async function startServer() {
         const potentialUrls: string[] = [];
 
         // Prioritize explicit GID or sheetName specified by the user
-        if (gid) {
-          potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`);
-          potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=${gid}`);
-        }
-        if (sheetName) {
-          potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`);
-          potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`);
-        }
+        if (isRaw) {
+          if (sheetName) {
+            potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`);
+            potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`);
+          } else if (gid) {
+            potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=${gid}`);
+            potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`);
+          } else {
+            potentialUrls.push(url);
+          }
+        } else {
+          if (gid) {
+            potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`);
+            potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&gid=${gid}`);
+          }
+          if (sheetName) {
+            potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=${encodeURIComponent(sheetName)}`);
+            potentialUrls.push(`https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`);
+          }
 
-        // Add standard sheet tabs and general sheet fallbacks to cover all bases
-        potentialUrls.push(
-          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=REKAP`,
-          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=REKAP`,
-          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv`,
-          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv`,
-          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=Sheet1`,
-          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=DATA`,
-          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=PROYEK`,
-          `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=Laporan`
-        );
+          // Add standard sheet tabs and general sheet fallbacks to cover all bases
+          potentialUrls.push(
+            `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=REKAP`,
+            `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=REKAP`,
+            `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv`,
+            `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv`,
+            `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=Sheet1`,
+            `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=DATA`,
+            `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=PROYEK`,
+            `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&sheet=Laporan`
+          );
+        }
 
         let success = false;
         let isPrivate = false;
@@ -107,6 +120,12 @@ async function startServer() {
             const rows = parseCSV(csvText);
             
             if (rows.length > 0) {
+              if (isRaw) {
+                console.log(`[Proxy] Successfully fetched and parsed ${rows.length} raw rows from ${csvUrl}`);
+                res.json({ source: "raw-csv", data: rows });
+                return;
+              }
+
               const mappedData = transformCSVRows(rows);
               
               // Double check we actually successfully mapped at least some records

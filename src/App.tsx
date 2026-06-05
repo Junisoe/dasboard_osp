@@ -6,6 +6,7 @@ import KPICards from "./components/KPICards";
 import StatusPipeline from "./components/StatusPipeline";
 import MonthlyCharts from "./components/MonthlyCharts";
 import ProjectTable from "./components/ProjectTable";
+import DesignatorDetailModal from "./components/DesignatorDetailModal";
 import { LayoutDashboard, CloudLightning, FileSpreadsheet, RefreshCw, Layers, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { parseCSVDirect, transformCSVRowsDirect } from "./utils/sheetParser";
@@ -62,6 +63,7 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [syncSuccess, setSyncSuccess] = useState(false);
   const [showConfig, setShowConfig] = useState<boolean>(false);
+  const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
 
   // Synchronize Google Sheets data trigger
   const handleConnectSheet = async (url: string): Promise<boolean> => {
@@ -451,7 +453,11 @@ export default function App() {
             <Layers className="w-5 h-5 text-indigo-600" />
             <h2 className="text-lg font-bold text-slate-800 tracking-tight">Daftar Detail LOP</h2>
           </div>
-          <ProjectTable data={data} onAddRow={handleAddSimulatedRow} />
+          <ProjectTable 
+            data={data} 
+            onAddRow={handleAddSimulatedRow} 
+            onLopClick={(item) => setSelectedProject(item)} 
+          />
         </div>
 
       </main>
@@ -462,6 +468,18 @@ export default function App() {
           <p>© 2026 PROYEKMON. Dashboard real-time terintegrasi dengan Google Apps Script.</p>
         </div>
       </footer>
+
+      {/* Rincian Detail Designator LOP Modal Overlay */}
+      <AnimatePresence>
+        {selectedProject && (
+          <DesignatorDetailModal
+            project={selectedProject}
+            apiUrl={apiUrl}
+            isLive={isLive}
+            onClose={() => setSelectedProject(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

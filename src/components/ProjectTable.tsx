@@ -7,12 +7,13 @@ import { motion, AnimatePresence } from "motion/react";
 interface ProjectTableProps {
   data: ProjectData[];
   onAddRow?: (newRow: Omit<ProjectData, "id">) => void;
+  onLopClick?: (lopItem: ProjectData) => void;
 }
 
 type SortField = "bln" | "jenis" | "pekerjaan" | "boq" | "status" | "namaLop" | "jumlah";
 type SortOrder = "asc" | "desc";
 
-export default function ProjectTable({ data, onAddRow }: ProjectTableProps) {
+export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTableProps) {
   // Search and main filters
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBln, setSelectedBln] = useState<string>("");
@@ -380,10 +381,10 @@ export default function ProjectTable({ data, onAddRow }: ProjectTableProps) {
                 </div>
               </th>
               <th className="py-3 px-3 w-[11%] text-right font-bold text-slate-400">
-                Material (IDR)
+                Material (Rp)
               </th>
               <th className="py-3 px-3 w-[11%] text-right font-bold text-slate-400">
-                Jasa (IDR)
+                Jasa (Rp)
               </th>
               <th className="py-3 px-3 w-[11%] text-right cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition" onClick={() => handleSort("jumlah")}>
                 <div className="flex items-center justify-end gap-1">
@@ -420,9 +421,14 @@ export default function ProjectTable({ data, onAddRow }: ProjectTableProps) {
                     </span>
                   </td>
                   <td className="py-4 px-4">
-                    <p className="font-semibold text-slate-800 line-clamp-1 text-xs" title={item.namaLop}>
+                    <button
+                      onClick={() => onLopClick?.(item)}
+                      className="font-bold text-indigo-600 hover:text-indigo-800 hover:underline hover:scale-[1.01] active:scale-[0.99] transition duration-150 cursor-pointer text-left line-clamp-1 block text-xs"
+                      title="Klik untuk melihat rincian detail designator LOP ini"
+                      id={`lop-click-${item.id}`}
+                    >
                       {item.namaLop}
-                    </p>
+                    </button>
                   </td>
                   <td className="py-4 px-3 text-right text-slate-600 font-semibold font-mono">
                     {formatIDR(item.material)}

@@ -182,32 +182,49 @@ export function sanitizeNumberDirect(val: any): number {
   
   str = str.replace(/(Rp|\$|EUR|IDR)\s?/gi, "");
   
-  const lastComma = str.lastIndexOf(",");
-  const lastDot = str.lastIndexOf(".");
+  const hasComma = str.includes(",");
+  const hasDot = str.includes(".");
   
-  if (lastComma > lastDot && (lastComma === str.length - 3 || lastComma === str.length - 2)) {
-    str = str.replace(/\./g, "").replace(/,/g, ".");
-  } else if (lastDot > lastComma && (lastDot === str.length - 3 || lastDot === str.length - 2)) {
-    str = str.replace(/,/g, "");
-  } else {
-    const commaCount = (str.match(/,/g) || []).length;
-    const dotCount = (str.match(/\./g) || []).length;
-    
-    if (commaCount > 1) {
+  if (hasComma && hasDot) {
+    // Determine decimal separator based on which one is the last separator
+    const lastCommaIdx = str.lastIndexOf(",");
+    const lastDotIdx = str.lastIndexOf(".");
+    if (lastCommaIdx > lastDotIdx) {
+      // Indonesian format: 1.532.060,00 -> remove dots, replace comma with dot decimal
+      str = str.replace(/\./g, "").replace(/,/g, ".");
+    } else {
+      // US/English format: 1,532,060.00 -> remove commas, keep the dot
       str = str.replace(/,/g, "");
-    } else if (dotCount > 1) {
-      str = str.replace(/\./g, "");
-    } else if (commaCount === 1 && dotCount === 0) {
+    }
+  } else if (hasComma) {
+    const commaCount = (str.match(/,/g) || []).length;
+    if (commaCount > 1) {
+      // Multiple commas: e.g. "1,500,000" -> thousands separators
+      str = str.replace(/,/g, "");
+    } else {
+      // Single comma: check if it is followed by exactly 3 digits
       const parts = str.split(",");
-      if (parts[1].length === 3) {
+      if (parts[1] && parts[1].length === 3) {
+        // e.g. "5,500" or "14,630" -> thousands separator because there is no other logical meaning in monetary prices
         str = str.replace(/,/g, "");
       } else {
+        // e.g. "12,5" or "1,5" -> decimal separator
         str = str.replace(/,/g, ".");
       }
-    } else if (dotCount === 1 && commaCount === 0) {
+    }
+  } else if (hasDot) {
+    const dotCount = (str.match(/\./g) || []).length;
+    if (dotCount > 1) {
+      // Multiple dots: e.g. "1.500.000" -> thousands separators
+      str = str.replace(/\./g, "");
+    } else {
+      // Single dot: check if it is followed by exactly 3 digits
       const parts = str.split(".");
-      if (parts[1].length === 3 && parseInt(parts[1]) % 100 === 0) {
+      if (parts[1] && parts[1].length === 3) {
+        // e.g. "5.500" or "14.630" or "44.810" -> thousands separator
         str = str.replace(/\./g, "");
+      } else {
+        // e.g. "1.5" or "12.5" -> decimal separator
       }
     }
   }
@@ -216,3 +233,190 @@ export function sanitizeNumberDirect(val: any): number {
   const num = parseFloat(sanitized);
   return isNaN(num) ? 0 : num;
 }
+
+export interface DesignatorDetail {
+  id: string;
+  code: string;
+  description: string;
+  unit: string;
+  rateMaterial: number;
+  rateJasa: number;
+  volume: number;
+  amountMaterial: number;
+  amountJasa: number;
+  amountTotal: number;
+}
+
+export function getDetailSheetNameForProject(pekerjaan: string, boq: string, jenis: string): string {
+  const pk = (pekerjaan || "").toUpperCase().trim();
+  const bq = (boq || "").toUpperCase().trim();
+  const jn = (jenis || "").toUpperCase().trim();
+
+  // 1. MHR specific routes (check first so that MHR projects never fall back to simpler string-includes rules)
+  if (pk === "MHR") {
+    if (bq.includes("OSP LAMA")) {
+      return "MHR OSP LAMA";
+    }
+    if (bq.includes("OSP BARU") || jn.includes("HEM")) {
+      return "MHR OSP BARU";
+    }
+    if (bq.includes("MTEL LAMA") || bq.includes("MITRATEL LAMA")) {
+      return "MHR MTEL LAMA";
+    }
+    if (bq.includes("MTEL BARU") || bq.includes("MITRATEL BARU")) {
+      return "MHR MTEL BARU";
+    }
+  }
+
+  // 2. Exact match rules for DKU, TA, LA
+  if (pk === "DKU" || bq === "DKU") {
+    return "DKU";
+  }
+  if (pk === "TA" || bq === "TA") {
+    return "TA";
+  }
+  if (pk === "LA" || bq === "LA") {
+    return "LA";
+  }
+
+  // 3. String includes fallback
+  if (pk.includes("DKU") || bq.includes("DKU")) {
+    return "DKU";
+  }
+  if (pk.includes("TA") || bq.includes("TA")) {
+    return "TA";
+  }
+  // Be extremely careful not to let "OSP LAMA" match "LA"
+  if ((pk.includes("LA") || bq.includes("LA")) && !bq.includes("LAMA")) {
+    return "LA";
+  }
+
+  // Fallback to DKU
+  return "DKU";
+}
+
+export function parseDesignatorSheetRows(rows: string[][], lopName: string): DesignatorDetail[] {
+  if (rows.length < 1) return [];
+
+  // 1. Find the header row
+  // We look for a row containing typical designator code headers, search first 10 rows
+  let headerRowIndex = 0;
+  let maxScore = -1;
+  const designatorKeywords = ["DESIGNATOR", "KODE", "CODE", "URAIAN", "SATUAN", "DESKRIPSI", "UNIT"];
+
+  const searchRange = Math.min(rows.length, 10);
+  for (let r = 0; r < searchRange; r++) {
+    const rowTokens = rows[r].map(c => String(c).toUpperCase());
+    let score = 0;
+    for (const kw of designatorKeywords) {
+      if (rowTokens.some(tok => tok.includes(kw))) {
+        score++;
+      }
+    }
+    if (score > maxScore) {
+      maxScore = score;
+      headerRowIndex = r;
+    }
+  }
+
+  const headerRow = rows[headerRowIndex] || [];
+  const headers = headerRow.map(h => String(h).trim().toUpperCase());
+
+  // 2. Find column matching our project (LOP) Name
+  let targetColIdx = -1;
+  const cleanLopName = lopName.trim().toUpperCase();
+
+  // Try direct substring match in headers
+  for (let c = 0; c < headerRow.length; c++) {
+    const val = (headerRow[c] || "").trim().toUpperCase();
+    if (val && (val.includes(cleanLopName) || cleanLopName.includes(val))) {
+      targetColIdx = c;
+      break;
+    }
+  }
+
+  // If not found, try alphanumeric clean match to bypass typo or special formatting
+  const cleanAlphanumeric = (s: string) => s.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+  if (targetColIdx === -1) {
+    const compLop = cleanAlphanumeric(lopName);
+    if (compLop) {
+      for (let c = 0; c < headerRow.length; c++) {
+        const val = cleanAlphanumeric(headerRow[c] || "");
+        if (val && (val.includes(compLop) || compLop.includes(val))) {
+          targetColIdx = c;
+          break;
+        }
+      }
+    }
+  }
+
+  // If still not matched, return empty or try to see if there is any column.
+  if (targetColIdx === -1) {
+    console.warn(`[sheetParser] Column matching LOP "${lopName}" not found in sheet headers:`, headers);
+    return [];
+  }
+
+  // 3. Find structural field column indices in this tab
+  const findHeaderIndex = (aliases: string[], fallback: number) => {
+    let idx = headers.findIndex(h => aliases.includes(h));
+    if (idx !== -1) return idx;
+    idx = headers.findIndex(h => aliases.some(alias => h.includes(alias)));
+    return idx !== -1 ? idx : fallback;
+  };
+
+  // Find designator code column
+  const idxCode = findHeaderIndex(["DESIGNATOR", "KODE", "CODE", "DESIGNATOR MITRATEL"], 1);
+  // Find project description column
+  const idxDesc = findHeaderIndex(["URAIAN PEKERJAAN", "URAIAN", "DESCRIPTION", "DESKRIPSI", "PEKERJAAN"], 4);
+  // Find unit column
+  const idxUnit = findHeaderIndex(["SATUAN", "UNIT"], 5);
+  // Find unit price material column
+  const idxRateMat = findHeaderIndex(["PAKET 5 MATERIAL", "HARGA SATUAN (PAKET-5) MATERIAL", "MATERIAL", "HARGA SATUAN MATERIAL", "PAKET 5   MATERIAL"], 6);
+  // Find unit price jasa column
+  const idxRateJas = findHeaderIndex(["JASA", "SERVICE", "SERVICES", "HARGA SATUAN JASA"], 7);
+
+  const list: DesignatorDetail[] = [];
+
+  for (let i = headerRowIndex + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length <= targetColIdx) continue;
+
+    const code = String(row[idxCode] || "").trim();
+    const desc = String(row[idxDesc] || "").trim();
+    if (!code && !desc) continue; // Skip totally empty spacer lines
+
+    // Filter out rows that are actually total sum rows or header duplicates
+    if (code.toUpperCase() === "TOTAL" || desc.toUpperCase().includes("TOTAL") || code.toUpperCase().includes("DESIGNATOR")) {
+      continue;
+    }
+
+    const volumeStr = row[targetColIdx] || "";
+    const volume = sanitizeNumberDirect(volumeStr);
+    
+    // Ignore rows where this project is not using this designator (volume is 0 or -)
+    if (volume <= 0) continue;
+
+    const rateMat = sanitizeNumberDirect(row[idxRateMat] || "0");
+    const rateJas = sanitizeNumberDirect(row[idxRateJas] || "0");
+
+    const amountMaterial = volume * rateMat;
+    const amountJasa = volume * rateJas;
+    const amountTotal = amountMaterial + amountJasa;
+
+    list.push({
+      id: String(i),
+      code: code || "N/A",
+      description: desc || "Uraian Pekerjaan",
+      unit: String(row[idxUnit] || "").trim() || "pcs",
+      rateMaterial: rateMat,
+      rateJasa: rateJas,
+      volume,
+      amountMaterial,
+      amountJasa,
+      amountTotal
+    });
+  }
+
+  return list;
+}
+

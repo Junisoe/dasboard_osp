@@ -212,7 +212,7 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
             </div>
             <div className="flex items-center md:justify-end gap-1.5">
               <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>
-              <span>Kalkulasi mileston berdasarkan pilar data real-time LOP MHR.</span>
+              <span>Kalkulasi milestone berdasarkan pilar data real-time LOP MHR.</span>
             </div>
           </div>
         </div>
