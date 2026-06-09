@@ -25,22 +25,34 @@ export default function App() {
     }
     // Enforce business rules:
     // 1. Nilai Total BOQ (jumlah) adalah hasil penjumlahan Material + Jasa
-    // 2. Pembagian Milestone 60% berlaku untuk pekerjaan MHR, DKU, dan TA. Sisa milestone lainnya khusus MHR.
+    // 2. Pembagian Milestone 60% berlaku untuk pekerjaan MHR, DKU QE, dan TA. Sisa milestone lainnya khusus MHR.
+    // 3. Khusus untuk DKU OSP, perolehan kita adalah 100% dari total BOQ.
     return rawList.map((item, idx) => {
-      const pekerjaan = String(item.pekerjaan || "DKU").toUpperCase();
+      const rawPekerjaan = String(item.pekerjaan || "DKU QE").toUpperCase().trim();
+      const pekerjaan = rawPekerjaan === "DKU" ? "DKU QE" : rawPekerjaan;
       const isMhr = pekerjaan === "MHR";
-      const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
+      const isDkuOrTa = pekerjaan === "DKU QE" || pekerjaan === "TA";
+      const isDkuOsp = pekerjaan === "DKU OSP";
       const material = Number(item.material) || 0;
       const jasa = Number(item.jasa) || 0;
       const jumlah = material + jasa;
-      const isMilestoneEligible = isMhr || isDkuOrTa;
+      const isMilestoneEligible = isMhr || isDkuOrTa || isDkuOsp;
+      
+      let calculatedPanjar = 0;
+      if (isDkuOsp) {
+        calculatedPanjar = Number(item.panjar60) || jumlah; // 100% of BOQ
+      } else if (isMilestoneEligible) {
+        calculatedPanjar = Number(item.panjar60) || Math.round(jumlah * 0.60);
+      }
+
       return {
         ...item,
         id: item.id || String(idx + 1),
+        pekerjaan,
         material,
         jasa,
         jumlah,
-        panjar60: isMilestoneEligible ? (Number(item.panjar60) || Math.round(jumlah * 0.60)) : 0,
+        panjar60: calculatedPanjar,
         panjarSitac: isMhr ? (Number(item.panjarSitac) || 0) : 0,
         pelunasan15: isMhr ? (Number(item.pelunasan15) || Math.round(jumlah * 0.15)) : 0,
         pendapatanMaharani: isMhr ? (Number(item.pendapatanMaharani) || Math.round(jumlah * 0.25)) : 0,
@@ -149,14 +161,24 @@ export default function App() {
 
         if (success) {
           const mappedProjects: ProjectData[] = parsedRows.map((row, idx) => {
-            const pekerjaan = String(row.pekerjaan || "DKU").toUpperCase();
+            const rawPekerjaan = String(row.pekerjaan || "DKU QE").toUpperCase().trim();
+            const pekerjaan = rawPekerjaan === "DKU" ? "DKU QE" : rawPekerjaan;
             const isMhr = pekerjaan === "MHR";
-            const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
+            const isDkuOrTa = pekerjaan === "DKU QE" || pekerjaan === "TA";
+            const isDkuOsp = pekerjaan === "DKU OSP";
             const material = Number(row.material) || 0;
             const jasa = Number(row.jasa) || 0;
             const sitac = Number(row.sitac) || 0;
             const jumlah = material + jasa;
-            const isMilestoneEligible = isMhr || isDkuOrTa;
+            const isMilestoneEligible = isMhr || isDkuOrTa || isDkuOsp;
+            
+            let calculatedPanjar = 0;
+            if (isDkuOsp) {
+              calculatedPanjar = Number(row.panjar60) || jumlah; // 100% of BOQ
+            } else if (isMilestoneEligible) {
+              calculatedPanjar = Number(row.panjar60) || Math.round(jumlah * 0.60);
+            }
+
             return {
               id: row.id || String(idx + 1),
               bln: String(row.bln || "MEI").toUpperCase(),
@@ -169,7 +191,7 @@ export default function App() {
               jasa: jasa,
               sitac: sitac,
               jumlah: jumlah,
-              panjar60: isMilestoneEligible ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
+              panjar60: calculatedPanjar,
               panjarSitac: isMhr ? (Number(row.panjarSitac) || sitac) : 0,
               pelunasan15: isMhr ? (Number(row.pelunasan15) || Math.round(jumlah * 0.15)) : 0,
               pendapatanMaharani: isMhr ? (Number(row.pendapatanMaharani) || Math.round(jumlah * 0.25)) : 0,
@@ -218,14 +240,24 @@ export default function App() {
       }
 
       const mappedProjects: ProjectData[] = incomingData.map((row, idx) => {
-        const pekerjaan = String(row.pekerjaan || "DKU").toUpperCase();
+        const rawPekerjaan = String(row.pekerjaan || "DKU QE").toUpperCase().trim();
+        const pekerjaan = rawPekerjaan === "DKU" ? "DKU QE" : rawPekerjaan;
         const isMhr = pekerjaan === "MHR";
-        const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
+        const isDkuOrTa = pekerjaan === "DKU QE" || pekerjaan === "TA";
+        const isDkuOsp = pekerjaan === "DKU OSP";
         const material = Number(row.material) || 0;
         const jasa = Number(row.jasa) || 0;
         const sitac = Number(row.sitac) || 0;
         const jumlah = material + jasa;
-        const isMilestoneEligible = isMhr || isDkuOrTa;
+        const isMilestoneEligible = isMhr || isDkuOrTa || isDkuOsp;
+        
+        let calculatedPanjar = 0;
+        if (isDkuOsp) {
+          calculatedPanjar = Number(row.panjar60) || jumlah; // 100% of BOQ
+        } else if (isMilestoneEligible) {
+          calculatedPanjar = Number(row.panjar60) || Math.round(jumlah * 0.60);
+        }
+
         return {
           id: row.id || String(idx + 1),
           bln: String(row.bln || "MEI").toUpperCase(),
@@ -238,7 +270,7 @@ export default function App() {
           jasa: jasa,
           sitac: sitac,
           jumlah: jumlah,
-          panjar60: isMilestoneEligible ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
+          panjar60: calculatedPanjar,
           panjarSitac: isMhr ? (Number(row.panjarSitac) || sitac) : 0,
           pelunasan15: isMhr ? (Number(row.pelunasan15) || Math.round(jumlah * 0.15)) : 0,
           pendapatanMaharani: isMhr ? (Number(row.pendapatanMaharani) || Math.round(jumlah * 0.25)) : 0,
@@ -277,20 +309,31 @@ export default function App() {
     setIsLive(false);
     setErrorMsg(null);
     setData(INITIAL_MOCK_DATA.map((row, idx) => {
-      const pekerjaan = String(row.pekerjaan || "DKU").toUpperCase();
+      const rawPekerjaan = String(row.pekerjaan || "DKU QE").toUpperCase().trim();
+      const pekerjaan = rawPekerjaan === "DKU" ? "DKU QE" : rawPekerjaan;
       const isMhr = pekerjaan === "MHR";
-      const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
+      const isDkuOrTa = pekerjaan === "DKU QE" || pekerjaan === "TA";
+      const isDkuOsp = pekerjaan === "DKU OSP";
       const material = Number(row.material) || 0;
       const jasa = Number(row.jasa) || 0;
       const jumlah = material + jasa;
-      const isMilestoneEligible = isMhr || isDkuOrTa;
+      const isMilestoneEligible = isMhr || isDkuOrTa || isDkuOsp;
+
+      let calculatedPanjar = 0;
+      if (isDkuOsp) {
+        calculatedPanjar = Number(row.panjar60) || jumlah; // 100% of BOQ
+      } else if (isMilestoneEligible) {
+        calculatedPanjar = Number(row.panjar60) || Math.round(jumlah * 0.60);
+      }
+
       return {
         ...row,
         id: row.id || String(idx + 1),
+        pekerjaan,
         material,
         jasa,
         jumlah,
-        panjar60: isMilestoneEligible ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
+        panjar60: calculatedPanjar,
         panjarSitac: isMhr ? (Number(row.panjarSitac) || 0) : 0,
         pelunasan15: isMhr ? (Number(row.pelunasan15) || Math.round(jumlah * 0.15)) : 0,
         pendapatanMaharani: isMhr ? (Number(row.pendapatanMaharani) || Math.round(jumlah * 0.25)) : 0,
@@ -310,23 +353,33 @@ export default function App() {
 
   // Handler to add mock / simulated row
   const handleAddSimulatedRow = (newRow: Omit<ProjectData, "id">) => {
-    const pekerjaan = String(newRow.pekerjaan || "DKU").toUpperCase();
+    const rawPekerjaan = String(newRow.pekerjaan || "DKU QE").toUpperCase().trim();
+    const pekerjaan = rawPekerjaan === "DKU" ? "DKU QE" : rawPekerjaan;
     const isMhr = pekerjaan === "MHR";
-    const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
+    const isDkuOrTa = pekerjaan === "DKU QE" || pekerjaan === "TA";
+    const isDkuOsp = pekerjaan === "DKU OSP";
     const material = Number(newRow.material) || 0;
     const jasa = Number(newRow.jasa) || 0;
     const sitac = Number(newRow.sitac) || 0;
     const jumlah = material + jasa; // Total BOQ: Material + Jasa
-    const isMilestoneEligible = isMhr || isDkuOrTa;
+    const isMilestoneEligible = isMhr || isDkuOrTa || isDkuOsp;
+
+    let calculatedPanjar = 0;
+    if (isDkuOsp) {
+      calculatedPanjar = jumlah; // 100% of BOQ
+    } else if (isMilestoneEligible) {
+      calculatedPanjar = Math.round(jumlah * 0.60);
+    }
 
     const freshRow: ProjectData = {
       ...newRow,
       id: String(Date.now()),
+      pekerjaan,
       material,
       jasa,
       sitac,
       jumlah,
-      panjar60: isMilestoneEligible ? Math.round(jumlah * 0.60) : 0,
+      panjar60: calculatedPanjar,
       panjarSitac: isMhr ? sitac : 0,
       pelunasan15: isMhr ? Math.round(jumlah * 0.15) : 0,
       pendapatanMaharani: isMhr ? Math.round(jumlah * 0.25) : 0,

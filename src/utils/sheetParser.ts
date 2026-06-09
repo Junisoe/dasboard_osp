@@ -124,7 +124,8 @@ export function transformCSVRowsDirect(rows: string[][]): any[] {
     const sitac = sanitizeNumberDirect(idxSitac !== -1 ? row[idxSitac] : "0");
     const jumlah = material + jasa;
     
-    const pekerjaanStr = idxPekerjaan !== -1 ? String(row[idxPekerjaan]).trim().toUpperCase() : "";
+    const rawPekerjaan = idxPekerjaan !== -1 ? String(row[idxPekerjaan]).trim().toUpperCase() : "";
+    const pekerjaanStr = rawPekerjaan === "DKU" ? "DKU QE" : rawPekerjaan;
 
     let panjar60 = 0;
     let panjarSitac = 0;
@@ -132,9 +133,15 @@ export function transformCSVRowsDirect(rows: string[][]): any[] {
     let pendapatanMaharani = 0;
 
     const isMhr = pekerjaanStr === "MHR";
-    const isDkuOrTa = pekerjaanStr === "DKU" || pekerjaanStr === "TA";
+    const isDkuOrTa = pekerjaanStr === "DKU QE" || pekerjaanStr === "TA";
+    const isDkuOsp = pekerjaanStr === "DKU OSP";
 
-    if (isMhr || isDkuOrTa) {
+    if (isDkuOsp) {
+      panjar60 = sanitizeNumberDirect(idxPanjar60 !== -1 ? row[idxPanjar60] : "0");
+      if (panjar60 === 0 && jumlah > 0) {
+        panjar60 = jumlah; // 100% of BOQ for DKU OSP
+      }
+    } else if (isMhr || isDkuOrTa) {
       panjar60 = sanitizeNumberDirect(idxPanjar60 !== -1 ? row[idxPanjar60] : "0");
       if (panjar60 === 0 && jumlah > 0) {
         panjar60 = Math.round(jumlah * 0.60);
@@ -161,7 +168,7 @@ export function transformCSVRowsDirect(rows: string[][]): any[] {
       id: String(i - headerRowIndex),
       bln: bln,
       jenis: idxJenis !== -1 ? row[idxJenis] : "",
-      pekerjaan: idxPekerjaan !== -1 ? row[idxPekerjaan] : "",
+      pekerjaan: pekerjaanStr,
       boq: idxBoq !== -1 ? row[idxBoq] : "",
       status: idxStatus !== -1 ? row[idxStatus] : "",
       namaLop: idxNamaLop !== -1 ? row[idxNamaLop] : "",
@@ -274,10 +281,17 @@ export function getDetailSheetNameForProject(pekerjaan: string, boq: string, jen
     }
   }
 
-  // 2. Exact match rules for DKU, TA, LA
-  if (pk === "DKU" || bq === "DKU") {
-    return "DKU";
+  // 2. DKU OSP sub-tab mapping
+  if (pk === "DKU OSP" || bq.includes("DKU OSP") || pk.includes("DKU OSP")) {
+    return "DKU OSP";
   }
+
+  // 3. DKU QE (and legacy DKU) sub-tab mapping
+  if (pk === "DKU QE" || pk === "DKU" || bq.includes("DKU QE") || pk.includes("DKU QE") || bq === "DKU" || pk.includes("DKU")) {
+    return "DKU QE";
+  }
+
+  // 4. Exact match rules for TA, LA
   if (pk === "TA" || bq === "TA") {
     return "TA";
   }
@@ -285,10 +299,7 @@ export function getDetailSheetNameForProject(pekerjaan: string, boq: string, jen
     return "LA";
   }
 
-  // 3. String includes fallback
-  if (pk.includes("DKU") || bq.includes("DKU")) {
-    return "DKU";
-  }
+  // 5. String includes fallback for TA, LA
   if (pk.includes("TA") || bq.includes("TA")) {
     return "TA";
   }
@@ -297,8 +308,8 @@ export function getDetailSheetNameForProject(pekerjaan: string, boq: string, jen
     return "LA";
   }
 
-  // Fallback to DKU
-  return "DKU";
+  // Fallback to DKU QE
+  return "DKU QE";
 }
 
 export function parseDesignatorSheetRows(rows: string[][], lopName: string): DesignatorDetail[] {
@@ -362,24 +373,35 @@ export function parseDesignatorSheetRows(rows: string[][], lopName: string): Des
     return [];
   }
 
-  // 3. Find structural field column indices in this tab
+  // 3. Find structural field column indices in this tab using exceptionally robust alphanumeric cleansing
+  const cleanStr = (s: string) => String(s).toUpperCase().replace(/[^A-Z0-9]/g, "");
+
   const findHeaderIndex = (aliases: string[], fallback: number) => {
-    let idx = headers.findIndex(h => aliases.includes(h));
+    const cleanAliases = aliases.map(cleanStr);
+    
+    // 1. Try exact cleaned match
+    let idx = headers.findIndex(h => cleanAliases.includes(cleanStr(h)));
     if (idx !== -1) return idx;
-    idx = headers.findIndex(h => aliases.some(alias => h.includes(alias)));
+    
+    // 2. Try cleaned substring match
+    idx = headers.findIndex(h => {
+      const ch = cleanStr(h);
+      if (!ch) return false;
+      return cleanAliases.some(alias => ch.includes(alias) || alias.includes(ch));
+    });
     return idx !== -1 ? idx : fallback;
   };
 
-  // Find designator code column
-  const idxCode = findHeaderIndex(["DESIGNATOR", "KODE", "CODE", "DESIGNATOR MITRATEL"], 1);
-  // Find project description column
-  const idxDesc = findHeaderIndex(["URAIAN PEKERJAAN", "URAIAN", "DESCRIPTION", "DESKRIPSI", "PEKERJAAN"], 4);
-  // Find unit column
-  const idxUnit = findHeaderIndex(["SATUAN", "UNIT"], 5);
-  // Find unit price material column
-  const idxRateMat = findHeaderIndex(["PAKET 5 MATERIAL", "HARGA SATUAN (PAKET-5) MATERIAL", "MATERIAL", "HARGA SATUAN MATERIAL", "PAKET 5   MATERIAL"], 6);
-  // Find unit price jasa column
-  const idxRateJas = findHeaderIndex(["JASA", "SERVICE", "SERVICES", "HARGA SATUAN JASA"], 7);
+  // Find designator code column - fallback is index 1 (Column B: Desinator)
+  const idxCode = findHeaderIndex(["DESIGNATOR", "DESINATOR", "KODE", "CODE", "DESIGNATOR MITRATEL"], 1);
+  // Find project description column - fallback is index 2 (Column C: Uraian Pekerjaan)
+  const idxDesc = findHeaderIndex(["URAIAN PEKERJAAN", "URAIAN", "DESCRIPTION", "DESKRIPSI", "PEKERJAAN"], 2);
+  // Find unit column - fallback is index 3 (Column D: Satuan)
+  const idxUnit = findHeaderIndex(["SATUAN", "UNIT"], 3);
+  // Find unit price material column - fallback is index 4 (Column E: Material)
+  const idxRateMat = findHeaderIndex(["PAKET 5 MATERIAL", "HARGA SATUAN (PAKET-5) MATERIAL", "MATERIAL", "HARGA SATUAN MATERIAL", "PAKET 5   MATERIAL"], 4);
+  // Find unit price jasa column - fallback is index 5 (Column F: Jasa)
+  const idxRateJas = findHeaderIndex(["JASA", "SERVICE", "SERVICES", "HARGA SATUAN JASA"], 5);
 
   const list: DesignatorDetail[] = [];
 

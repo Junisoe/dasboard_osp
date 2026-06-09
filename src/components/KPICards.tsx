@@ -93,7 +93,7 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
     }
   ];
 
-  const [selectedSector, setSelectedSector] = useState<"ALL" | "MHR" | "DKU" | "TA">("ALL");
+  const [selectedSector, setSelectedSector] = useState<"ALL" | "MHR" | "DKU_QE" | "DKU_OSP" | "TA">("ALL");
 
   // Sector MHR
   const mhrData = activeData.filter(item => String(item.pekerjaan).toUpperCase() === "MHR");
@@ -103,10 +103,18 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
   const mhrPelunasan15 = mhrData.reduce((sum, item) => sum + (item.pelunasan15 || 0), 0);
   const mhrPendapatanMaharani = mhrData.reduce((sum, item) => sum + (item.pendapatanMaharani || 0), 0);
 
-  // Sector DKU
-  const dkuData = activeData.filter(item => String(item.pekerjaan).toUpperCase() === "DKU");
+  // Sector DKU QE (includes both "DKU QE" and the old "DKU" for backwards compatibility)
+  const dkuData = activeData.filter(item => {
+    const pk = String(item.pekerjaan).toUpperCase();
+    return pk === "DKU QE" || pk === "DKU";
+  });
   const dkuTotalBOQ = dkuData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
   const dkuPanjar60 = dkuData.reduce((sum, item) => sum + (item.panjar60 || 0), 0);
+
+  // Sector DKU OSP
+  const dkuOspData = activeData.filter(item => String(item.pekerjaan).toUpperCase() === "DKU OSP");
+  const dkuOspTotalBOQ = dkuOspData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
+  const dkuOspPanjar100 = dkuOspData.reduce((sum, item) => sum + (item.panjar60 || 0), 0);
 
   // Sector TA
   const taData = activeData.filter(item => String(item.pekerjaan).toUpperCase() === "TA");
@@ -192,10 +200,10 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
         ))}
       </div>
 
-      {/* Financial Milestone Cards - Only shown if MHR, DKU, or TA is present in active view */}
+       {/* Financial Milestone Cards - Only shown if MHR, DKU QE, DKU OSP, or TA is present in active view */}
       {activeData.some(item => {
         const pk = String(item.pekerjaan || "").toUpperCase();
-        return pk === "MHR" || pk === "DKU" || pk === "TA";
+        return pk === "MHR" || pk === "DKU QE" || pk === "DKU" || pk === "DKU OSP" || pk === "TA";
       }) && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3 border-b border-slate-100 pb-4">
@@ -226,14 +234,24 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
                 Sektor MHR
               </button>
               <button
-                onClick={() => setSelectedSector("DKU")}
+                onClick={() => setSelectedSector("DKU_QE")}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                  selectedSector === "DKU"
-                    ? "bg-sky-50 bg-white text-sky-700 shadow-sm border border-sky-100"
-                    : "text-slate-500 hover:text-sky-750"
+                  selectedSector === "DKU_QE"
+                    ? "bg-cyan-50 bg-white text-cyan-700 shadow-sm border border-cyan-100"
+                    : "text-slate-500 hover:text-cyan-750"
                 }`}
               >
-                Sektor DKU
+                Sektor DKU QE
+              </button>
+              <button
+                onClick={() => setSelectedSector("DKU_OSP")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  selectedSector === "DKU_OSP"
+                    ? "bg-emerald-50 bg-white text-emerald-700 shadow-sm border border-emerald-100"
+                    : "text-slate-500 hover:text-emerald-750"
+                }`}
+              >
+                Sektor DKU OSP
               </button>
               <button
                 onClick={() => setSelectedSector("TA")}
@@ -292,35 +310,66 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
               </div>
             )}
 
-            {/* Sektor DKU & Sektor TA Section */}
-            {(selectedSector === "ALL" || selectedSector === "DKU" || selectedSector === "TA") && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-                {(selectedSector === "ALL" || selectedSector === "DKU") && (
+            {/* Sektor DKU QE, Sektor DKU OSP, & Sektor TA Section */}
+            {(selectedSector === "ALL" || selectedSector === "DKU_QE" || selectedSector === "DKU_OSP" || selectedSector === "TA") && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
+                {(selectedSector === "ALL" || selectedSector === "DKU_QE") && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="flex items-center gap-1.5 border-l-2 border-sky-500 pl-2">
-                        <h4 className="text-xs font-bold text-slate-800 tracking-wider uppercase">SEKTOR DKU (Milestone 60%)</h4>
+                      <div className="flex items-center gap-1.5 border-l-2 border-cyan-500 pl-2">
+                        <h4 className="text-xs font-bold text-slate-800 tracking-wider uppercase">SEKTOR DKU QE (Milestone 60%)</h4>
                       </div>
-                      <span className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-md font-mono font-bold border border-sky-100/50">
-                        Total BOQ DKU: {formatIDR(dkuTotalBOQ)}
+                      <span className="text-[10px] bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded-md font-mono font-bold border border-cyan-100/50">
+                        Total BOQ DKU QE: {formatIDR(dkuTotalBOQ)}
                       </span>
                     </div>
                     <motion.div
                       initial={{ opacity: 0, scale: 0.98 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="p-4 rounded-xl border bg-white flex items-center justify-between text-sky-700 bg-sky-50/70 border-sky-100 transition-all duration-200 hover:scale-[1.01]"
+                      className="p-4 rounded-xl border bg-white flex items-center justify-between text-cyan-700 bg-cyan-50/70 border-cyan-100 transition-all duration-200 hover:scale-[1.01]"
                     >
                       <div className="min-w-0">
                         <span className="text-[10px] font-bold uppercase tracking-wider opacity-85 block mb-1">
-                          Penghasilan 60% DKU (60% Material + Jasa)
+                          Penghasilan 60% DKU QE (60% Material + Jasa)
                         </span>
                         <span className="text-xl font-extrabold tracking-tight block">
                           {formatIDR(dkuPanjar60)}
                         </span>
-                        <span className="text-[9px] opacity-75 mt-0.5 block">60% porsi keuangan ini merupakan Penghasilan selesai operasional</span>
+                        <span className="text-[9px] opacity-75 mt-0.5 block">60% porsi keuangan ini merupakan Penghasilan selesai operasional kawan</span>
                       </div>
-                      <div className="p-3 bg-white/70 rounded-lg shadow-sm border border-sky-100 shrink-0 ml-3">
-                        <Landmark className="w-5 h-5 text-sky-500" />
+                      <div className="p-3 bg-white/70 rounded-lg shadow-sm border border-cyan-100 shrink-0 ml-3">
+                        <Landmark className="w-5 h-5 text-cyan-500" />
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+
+                {(selectedSector === "ALL" || selectedSector === "DKU_OSP") && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-1.5 border-l-2 border-emerald-500 pl-2">
+                        <h4 className="text-xs font-bold text-slate-800 tracking-wider uppercase">SEKTOR DKU OSP (Milestone 100%)</h4>
+                      </div>
+                      <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md font-mono font-bold border border-emerald-100/50">
+                        Total BOQ DKU OSP: {formatIDR(dkuOspTotalBOQ)}
+                      </span>
+                    </div>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-4 rounded-xl border bg-white flex items-center justify-between text-emerald-700 bg-emerald-50/70 border-emerald-100 transition-all duration-200 hover:scale-[1.01]"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-85 block mb-1">
+                          Penghasilan 100% DKU OSP (100% Material + Jasa)
+                        </span>
+                        <span className="text-xl font-extrabold tracking-tight block">
+                          {formatIDR(dkuOspPanjar100)}
+                        </span>
+                        <span className="text-[9px] opacity-75 mt-0.5 block">Khusus DKU OSP perolehan adalah 100% penuh dari total BOQ</span>
+                      </div>
+                      <div className="p-3 bg-white/70 rounded-lg shadow-sm border border-emerald-100 shrink-0 ml-3">
+                        <Landmark className="w-5 h-5 text-emerald-500" />
                       </div>
                     </motion.div>
                   </div>
@@ -330,7 +379,7 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
                   <div className="space-y-3">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-1.5 border-l-2 border-indigo-500 pl-2">
-                        <h4 className="text-xs font-bold text-slate-800 tracking-wider uppercase">SEKTOR TA (Milestone 60%)</h4>
+                        <h4 className="text-xs font-bold text-slate-850 tracking-wider uppercase">SEKTOR TA (Milestone 60%)</h4>
                       </div>
                       <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-mono font-bold border border-indigo-100/50">
                         Total BOQ TA: {formatIDR(taTotalBOQ)}
@@ -348,7 +397,7 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
                         <span className="text-xl font-extrabold tracking-tight block">
                           {formatIDR(taPanjar60)}
                         </span>
-                        <span className="text-[9px] opacity-75 mt-0.5 block">60% porsi keuangan ini merupakan Penghasilan selesai operasional</span>
+                        <span className="text-[9px] opacity-75 mt-0.5 block">60% porsi keuangan ini merupakan Penghasilan selesai operasional kawan</span>
                       </div>
                       <div className="p-3 bg-white/70 rounded-lg shadow-sm border border-indigo-100 shrink-0 ml-3">
                         <Landmark className="w-5 h-5 text-indigo-500" />
@@ -370,7 +419,7 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
             </div>
             <div className="flex items-center md:justify-end gap-1.5">
               <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>
-              <span>Kalkulasi milestone berdasarkan pilar data real-time LOP MHR, DKU, dan TA.</span>
+              <span>Kalkulasi milestone berdasarkan pilar data real-time LOP MHR, DKU QE, DKU OSP, dan TA.</span>
             </div>
           </div>
         </div>

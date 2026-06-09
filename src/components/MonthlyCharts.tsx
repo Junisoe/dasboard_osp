@@ -352,7 +352,7 @@ export default function MonthlyCharts({ filteredData }: MonthlyChartsProps) {
                 {/* Pekerjaan Breakdown */}
                 <div className="space-y-3">
                   <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                    Sektor Pekerjaan Pembagian (DKU, TA, MHR)
+                    Sektor Pekerjaan Pembagian (DKU QE, DKU OSP, TA, MHR)
                   </div>
                   <div className="h-[260px] w-full">
                     <ResponsiveContainer width="100%" height="100%">

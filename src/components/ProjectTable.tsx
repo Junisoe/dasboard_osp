@@ -33,7 +33,7 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
   const [newRow, setNewRow] = useState({
     bln: "MEI",
     jenis: "RECOVERY",
-    pekerjaan: "DKU",
+    pekerjaan: "DKU QE",
     boq: "OSP LAMA",
     status: "BERKAS DONE",
     namaLop: "",
@@ -138,16 +138,25 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
 
     const pekerjaan = String(newRow.pekerjaan).toUpperCase();
     const isMhr = pekerjaan === "MHR";
-    const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
+    const isDkuOrTa = pekerjaan === "DKU QE" || pekerjaan === "TA";
+    const isDkuOsp = pekerjaan === "DKU OSP";
     const baseAmount = Number(newRow.material) + Number(newRow.jasa); // Total BOQ: Material + Jasa
     const sitacVal = Number(newRow.sitac);
+    
+    let calculatedPanjar = 0;
+    if (isDkuOsp) {
+      calculatedPanjar = baseAmount; // 100% perolehan dari BOQ
+    } else if (isMhr || isDkuOrTa) {
+      calculatedPanjar = Math.round(baseAmount * 0.60);
+    }
+
     const resolvedRow = {
       ...newRow,
       material: Number(newRow.material),
       jasa: Number(newRow.jasa),
       sitac: sitacVal,
       jumlah: baseAmount,
-      panjar60: (isMhr || isDkuOrTa) ? Math.round(baseAmount * 0.60) : 0,
+      panjar60: calculatedPanjar,
       panjarSitac: isMhr ? sitacVal : 0,
       pelunasan15: isMhr ? Math.round(baseAmount * 0.15) : 0,
       pendapatanMaharani: isMhr ? Math.round(baseAmount * 0.25) : 0
@@ -161,7 +170,7 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
     setNewRow({
       bln: "MEI",
       jenis: "RECOVERY",
-      pekerjaan: "DKU",
+      pekerjaan: "DKU QE",
       boq: "OSP LAMA",
       status: "BERKAS DONE",
       namaLop: "",
@@ -196,8 +205,11 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
 
   const getJobColor = (job: string) => {
     switch (String(job).toUpperCase()) {
+      case "DKU QE":
       case "DKU":
-        return "bg-cyan-50 text-cyan-700 border-cyan-100";
+        return "bg-cyan-50 text-cyan-750 border-cyan-150";
+      case "DKU OSP":
+        return "bg-emerald-50 text-emerald-700 border-emerald-100";
       case "TA":
         return "bg-purple-50 text-purple-700 border-purple-100";
       case "MHR":
@@ -445,7 +457,11 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
                   </td>
                   <td className="py-4 px-4 text-right font-mono">
                     <div className="flex flex-col text-[10px] text-slate-500 gap-0.5 font-medium leading-normal">
-                      {item.panjar60 > 0 && <span className="text-blue-600">P60%: {formatIDR(item.panjar60)}</span>}
+                      {item.panjar60 > 0 && (
+                        <span className="text-blue-600 font-extrabold">
+                          {String(item.pekerjaan).toUpperCase() === "DKU OSP" ? "P100%" : "P60%"}: {formatIDR(item.panjar60)}
+                        </span>
+                      )}
                       {item.panjarSitac > 0 && <span className="text-amber-600">SITAC: {formatIDR(item.panjarSitac)}</span>}
                       {item.pelunasan15 > 0 && <span className="text-emerald-600">P15%: {formatIDR(item.pelunasan15)}</span>}
                       {item.pendapatanMaharani > 0 && <span className="text-purple-600">M25%: {formatIDR(item.pendapatanMaharani)}</span>}
@@ -565,11 +581,11 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
                   <div>
                     <label className="block text-xs font-bold text-slate-600 uppercase tracking-wide mb-1">Sektor Pekerjaan</label>
                     <select
-                      className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                       className="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                       value={newRow.pekerjaan}
                       onChange={(e) => setNewRow({ ...newRow, pekerjaan: e.target.value })}
                     >
-                      {["DKU", "TA", "MHR"].map(p => (
+                      {["DKU QE", "DKU OSP", "TA", "MHR"].map(p => (
                         <option key={p} value={p}>{p}</option>
                       ))}
                     </select>

@@ -153,7 +153,7 @@ export default function DesignatorDetailModal({ project, apiUrl, isLive, onClose
   function generateMockDesignators(proj: ProjectData): DesignatorDetail[] {
     const isMhr = proj.pekerjaan === "MHR";
     const isTa = proj.pekerjaan === "TA";
-    const isDku = proj.pekerjaan === "DKU";
+    const isDku = proj.pekerjaan === "DKU" || proj.pekerjaan === "DKU QE" || proj.pekerjaan === "DKU OSP";
     
     const mockItems: DesignatorDetail[] = [];
     
