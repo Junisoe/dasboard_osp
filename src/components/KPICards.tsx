@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ProjectData } from "../types";
 import { formatIDR, formatCompactIDR, formatNumber } from "../utils/formatter";
 import { Briefcase, Coins, Database, HardDrive, ShieldCheck, TrendingUp, Landmark, FileText, Settings } from "lucide-react";
@@ -9,21 +10,27 @@ interface KPICardsProps {
 }
 
 export default function KPICards({ filteredData, totalDataCount }: KPICardsProps) {
-  // Compute totals
-  const totalProjects = filteredData.length;
-  const totalBOQ = filteredData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
-  const totalMaterial = filteredData.reduce((sum, item) => sum + (item.material || 0), 0);
-  const totalJasa = filteredData.reduce((sum, item) => sum + (item.jasa || 0), 0);
-  const totalSitac = filteredData.reduce((sum, item) => sum + (item.sitac || 0), 0);
+  // Exclude BATAL from all KPI metrics and calculations
+  const activeData = filteredData.filter(item => String(item.status || "").toUpperCase() !== "BATAL");
+
+  // Compute totals based on active non-batal LOPs
+  const totalProjects = activeData.length;
+  const totalBOQ = activeData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
+  const totalMaterial = activeData.reduce((sum, item) => sum + (item.material || 0), 0);
+  const totalJasa = activeData.reduce((sum, item) => sum + (item.jasa || 0), 0);
+  const totalSitac = activeData.reduce((sum, item) => sum + (item.sitac || 0), 0);
 
   // Milestone/Financial summaries
-  const totalPanjar60 = filteredData.reduce((sum, item) => sum + (item.panjar60 || 0), 0);
-  const totalPanjarSitac = filteredData.reduce((sum, item) => sum + (item.panjarSitac || 0), 0);
-  const totalPelunasan15 = filteredData.reduce((sum, item) => sum + (item.pelunasan15 || 0), 0);
-  const totalPendapatanMaharani = filteredData.reduce((sum, item) => sum + (item.pendapatanMaharani || 0), 0);
+  const totalPanjar60 = activeData.reduce((sum, item) => sum + (item.panjar60 || 0), 0);
+  const totalPanjarSitac = activeData.reduce((sum, item) => sum + (item.panjarSitac || 0), 0);
+  const totalPelunasan15 = activeData.reduce((sum, item) => sum + (item.pelunasan15 || 0), 0);
+  const totalPendapatanMaharani = activeData.reduce((sum, item) => sum + (item.pendapatanMaharani || 0), 0);
+
+  // Compute active data limit
+  const activeTotalDataCount = totalDataCount;
 
   // Status-based breakdown (for active or done statuses)
-  const doneCount = filteredData.filter(item => item.status === "BERKAS DONE").length;
+  const doneCount = activeData.filter(item => item.status === "BERKAS DONE").length;
   const donePercentage = totalProjects > 0 ? (doneCount / totalProjects) * 100 : 0;
 
   const cardData = [
@@ -31,13 +38,13 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
       id: "stat-project",
       title: "Total LOP Aktif",
       value: formatNumber(totalProjects),
-      suffix: `dari ${totalDataCount} LOP`,
+      suffix: `dari ${activeTotalDataCount} LOP Aktif`,
       description: "Jumlah progres LOP dalam filter saat ini",
       icon: Briefcase,
       color: "from-indigo-500 to-blue-600",
       bgLight: "bg-indigo-50/50 text-indigo-700",
       progressBar: {
-        percentage: totalDataCount > 0 ? (totalProjects / totalDataCount) * 100 : 0,
+        percentage: activeTotalDataCount > 0 ? (totalProjects / activeTotalDataCount) * 100 : 0,
         label: "Rasio data terfilter",
         color: "bg-indigo-600"
       }
@@ -86,28 +93,48 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
     }
   ];
 
-  const financialMilestones = [
+  const [selectedSector, setSelectedSector] = useState<"ALL" | "MHR" | "DKU" | "TA">("ALL");
+
+  // Sector MHR
+  const mhrData = activeData.filter(item => String(item.pekerjaan).toUpperCase() === "MHR");
+  const mhrTotalBOQ = mhrData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
+  const mhrPanjar60 = mhrData.reduce((sum, item) => sum + (item.panjar60 || 0), 0);
+  const mhrPanjarSitac = mhrData.reduce((sum, item) => sum + (item.panjarSitac || 0), 0);
+  const mhrPelunasan15 = mhrData.reduce((sum, item) => sum + (item.pelunasan15 || 0), 0);
+  const mhrPendapatanMaharani = mhrData.reduce((sum, item) => sum + (item.pendapatanMaharani || 0), 0);
+
+  // Sector DKU
+  const dkuData = activeData.filter(item => String(item.pekerjaan).toUpperCase() === "DKU");
+  const dkuTotalBOQ = dkuData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
+  const dkuPanjar60 = dkuData.reduce((sum, item) => sum + (item.panjar60 || 0), 0);
+
+  // Sector TA
+  const taData = activeData.filter(item => String(item.pekerjaan).toUpperCase() === "TA");
+  const taTotalBOQ = taData.reduce((sum, item) => sum + (item.jumlah || 0), 0);
+  const taPanjar60 = taData.reduce((sum, item) => sum + (item.panjar60 || 0), 0);
+
+  const mhrMilestones = [
     {
-      title: "Panjar 60% Terbayar",
-      value: totalPanjar60,
-      color: "text-blue-700 bg-blue-50/70 border-blue-100",
-      iconColor: "text-blue-500"
+      title: "Panjar 60% MHR",
+      value: mhrPanjar60,
+      color: "text-rose-700 bg-rose-50/70 border-rose-100",
+      iconColor: "text-rose-500"
     },
     {
-      title: "Panjar SITAC",
-      value: totalPanjarSitac,
+      title: "Panjar SITAC MHR",
+      value: mhrPanjarSitac,
       color: "text-amber-700 bg-amber-50/70 border-amber-100",
       iconColor: "text-amber-500"
     },
     {
-      title: "Pelunasan 15%",
-      value: totalPelunasan15,
+      title: "Pelunasan 15% MHR",
+      value: mhrPelunasan15,
       color: "text-teal-700 bg-teal-50/70 border-teal-100",
       iconColor: "text-teal-500"
     },
     {
       title: "Pendapatan Maharani 25%",
-      value: totalPendapatanMaharani,
+      value: mhrPendapatanMaharani,
       color: "text-purple-700 bg-purple-50/70 border-purple-100",
       iconColor: "text-purple-500"
     }
@@ -165,45 +192,176 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
         ))}
       </div>
 
-      {/* Financial Milestone Cards - Only shown if MHR is present in filtered view */}
-      {filteredData.some(item => String(item.pekerjaan).toUpperCase() === "MHR") && (
+      {/* Financial Milestone Cards - Only shown if MHR, DKU, or TA is present in active view */}
+      {activeData.some(item => {
+        const pk = String(item.pekerjaan || "").toUpperCase();
+        return pk === "MHR" || pk === "DKU" || pk === "TA";
+      }) && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div className="flex items-center justify-between mb-5 flex-wrap gap-3 border-b border-slate-100 pb-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-base font-bold text-slate-800 tracking-tight">Status Finansial & Pembagian Milestone (Khusus MHR)</h3>
+              <h3 className="text-base font-bold text-slate-800 tracking-tight">Status Finansial & Pembagian Milestone</h3>
             </div>
-            <span className="text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-100/50 px-2 py-0.5 rounded-md">
-              Sektor Pekerjaan MHR
-            </span>
-          </div>
-          
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {financialMilestones.map((milestone, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.15 + (idx * 0.05) }}
-                className={`p-4 rounded-xl border flex items-center justify-between ${milestone.color} transition-all duration-200 hover:scale-[1.01]`}
+            
+            <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200/50">
+              <button
+                onClick={() => setSelectedSector("ALL")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  selectedSector === "ALL"
+                    ? "bg-white text-indigo-700 shadow-sm"
+                    : "text-slate-500 hover:text-slate-900"
+                }`}
               >
-                <div className="min-w-0">
-                  <span className="text-xs font-semibold uppercase tracking-wider opacity-80 block mb-1">
-                    {milestone.title}
-                  </span>
-                  <span className="text-xl md:text-2xl font-extrabold tracking-tight">
-                    {formatIDR(milestone.value)}
+                Semua Sektor
+              </button>
+              <button
+                onClick={() => setSelectedSector("MHR")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  selectedSector === "MHR"
+                    ? "bg-rose-50 bg-white text-rose-700 shadow-sm border border-rose-100"
+                    : "text-slate-500 hover:text-rose-700"
+                }`}
+              >
+                Sektor MHR
+              </button>
+              <button
+                onClick={() => setSelectedSector("DKU")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  selectedSector === "DKU"
+                    ? "bg-sky-50 bg-white text-sky-700 shadow-sm border border-sky-100"
+                    : "text-slate-500 hover:text-sky-750"
+                }`}
+              >
+                Sektor DKU
+              </button>
+              <button
+                onClick={() => setSelectedSector("TA")}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                  selectedSector === "TA"
+                    ? "bg-indigo-50 bg-white text-indigo-700 shadow-sm border border-indigo-100"
+                    : "text-slate-500 hover:text-indigo-750"
+                }`}
+              >
+                Sektor TA
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            {/* Sektor MHR Section */}
+            {(selectedSector === "ALL" || selectedSector === "MHR") && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-1.5 border-l-2 border-rose-500 pl-2">
+                    <h4 className="text-xs font-bold text-slate-800 tracking-wider uppercase">SEKTOR MHR (4 Tahap Milestone)</h4>
+                  </div>
+                  <span className="text-[10px] bg-rose-50 text-rose-700 px-2 py-0.5 rounded-md font-mono font-bold border border-rose-100/50">
+                    Total BOQ MHR: {formatIDR(mhrTotalBOQ)}
                   </span>
                 </div>
-                <div className="p-3 bg-white/70 rounded-lg shadow-sm border border-black/[0.03] ml-3 shrink-0">
-                  <Landmark className={`w-5 h-5 ${milestone.iconColor}`} />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {mhrMilestones.map((milestone, idx) => (
+                    <motion.div
+                      key={`mhr-${idx}`}
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className={`p-4 rounded-xl border flex items-center justify-between bg-white ${milestone.color} transition-all duration-200 hover:scale-[1.01]`}
+                    >
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-80 block mb-1">
+                          {milestone.title}
+                        </span>
+                        <span className="text-lg md:text-xl font-extrabold tracking-tight block">
+                          {formatIDR(milestone.value)}
+                        </span>
+                      </div>
+                      <div className="p-2.5 bg-white/70 rounded-lg shadow-sm border border-black/[0.03] ml-2 shrink-0">
+                        <Landmark className={`w-4 h-4 ${milestone.iconColor}`} />
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
-              </motion.div>
-            ))}
+                {/* Info block for MHR financial math */}
+                <div className="bg-rose-50/40 rounded-xl p-3 border border-rose-100/30 text-[11px] text-rose-800 leading-relaxed flex items-start gap-2 mt-2">
+                  <span className="text-sm shrink-0 mt-0.5">ℹ️</span>
+                  <span>
+                    Bagi <strong>Sektor MHR</strong>, nominal 60% disebut sebagai <strong>PANJAR</strong> karena sisa pelunasan sebesar <strong>15%</strong> baru dibayarkan ketika progres berkas mencapai <strong>STATUS TERBAYAR / BERKAS DONE</strong>. Dengan sisa 25% keuntungan, MHR secara tepat memperoleh hak bersih sebesar <strong>25%</strong> dari total pekerjaan MHR.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Sektor DKU & Sektor TA Section */}
+            {(selectedSector === "ALL" || selectedSector === "DKU" || selectedSector === "TA") && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
+                {(selectedSector === "ALL" || selectedSector === "DKU") && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-1.5 border-l-2 border-sky-500 pl-2">
+                        <h4 className="text-xs font-bold text-slate-800 tracking-wider uppercase">SEKTOR DKU (Milestone 60%)</h4>
+                      </div>
+                      <span className="text-[10px] bg-sky-50 text-sky-700 px-2 py-0.5 rounded-md font-mono font-bold border border-sky-100/50">
+                        Total BOQ DKU: {formatIDR(dkuTotalBOQ)}
+                      </span>
+                    </div>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-4 rounded-xl border bg-white flex items-center justify-between text-sky-700 bg-sky-50/70 border-sky-100 transition-all duration-200 hover:scale-[1.01]"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-85 block mb-1">
+                          Penghasilan 60% DKU (60% Material + Jasa)
+                        </span>
+                        <span className="text-xl font-extrabold tracking-tight block">
+                          {formatIDR(dkuPanjar60)}
+                        </span>
+                        <span className="text-[9px] opacity-75 mt-0.5 block">60% porsi keuangan ini merupakan Penghasilan selesai operasional</span>
+                      </div>
+                      <div className="p-3 bg-white/70 rounded-lg shadow-sm border border-sky-100 shrink-0 ml-3">
+                        <Landmark className="w-5 h-5 text-sky-500" />
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+
+                {(selectedSector === "ALL" || selectedSector === "TA") && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-1.5 border-l-2 border-indigo-500 pl-2">
+                        <h4 className="text-xs font-bold text-slate-800 tracking-wider uppercase">SEKTOR TA (Milestone 60%)</h4>
+                      </div>
+                      <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-mono font-bold border border-indigo-100/50">
+                        Total BOQ TA: {formatIDR(taTotalBOQ)}
+                      </span>
+                    </div>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="p-4 rounded-xl border bg-white flex items-center justify-between text-indigo-700 bg-indigo-50/70 border-indigo-100 transition-all duration-200 hover:scale-[1.01]"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider opacity-85 block mb-1">
+                          Penghasilan 60% TA (60% Material + Jasa)
+                        </span>
+                        <span className="text-xl font-extrabold tracking-tight block">
+                          {formatIDR(taPanjar60)}
+                        </span>
+                        <span className="text-[9px] opacity-75 mt-0.5 block">60% porsi keuangan ini merupakan Penghasilan selesai operasional</span>
+                      </div>
+                      <div className="p-3 bg-white/70 rounded-lg shadow-sm border border-indigo-100 shrink-0 ml-3">
+                        <Landmark className="w-5 h-5 text-indigo-500" />
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Real-time Status Progress Header */}
-          <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-50 text-xs text-slate-500">
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100 text-xs text-slate-500">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4.5 h-4.5 text-emerald-500 shrink-0" />
               <span>
@@ -212,7 +370,7 @@ export default function KPICards({ filteredData, totalDataCount }: KPICardsProps
             </div>
             <div className="flex items-center md:justify-end gap-1.5">
               <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block"></span>
-              <span>Kalkulasi milestone berdasarkan pilar data real-time LOP MHR.</span>
+              <span>Kalkulasi milestone berdasarkan pilar data real-time LOP MHR, DKU, dan TA.</span>
             </div>
           </div>
         </div>

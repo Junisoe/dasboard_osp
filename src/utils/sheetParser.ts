@@ -131,15 +131,21 @@ export function transformCSVRowsDirect(rows: string[][]): any[] {
     let pelunasan15 = 0;
     let pendapatanMaharani = 0;
 
-    if (pekerjaanStr === "MHR") {
+    const isMhr = pekerjaanStr === "MHR";
+    const isDkuOrTa = pekerjaanStr === "DKU" || pekerjaanStr === "TA";
+
+    if (isMhr || isDkuOrTa) {
       panjar60 = sanitizeNumberDirect(idxPanjar60 !== -1 ? row[idxPanjar60] : "0");
+      if (panjar60 === 0 && jumlah > 0) {
+        panjar60 = Math.round(jumlah * 0.60);
+      }
+    }
+
+    if (isMhr) {
       panjarSitac = sanitizeNumberDirect(idxPanjarSitac !== -1 ? row[idxPanjarSitac] : "0");
       pelunasan15 = sanitizeNumberDirect(idxPelunasan15 !== -1 ? row[idxPelunasan15] : "0");
       pendapatanMaharani = sanitizeNumberDirect(idxPendapatanMaharani !== -1 ? row[idxPendapatanMaharani] : "0");
 
-      if (panjar60 === 0 && jumlah > 0) {
-        panjar60 = Math.round(jumlah * 0.60);
-      }
       if (panjarSitac === 0 && sitac > 0) {
         panjarSitac = sitac;
       }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ProjectData } from "../types";
 import { formatCompactIDR, formatIDR, formatNumber } from "../utils/formatter";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from "recharts";
-import { BarChart3, TrendingUp, PieChart as PieIcon, Layers, CalendarRange } from "lucide-react";
+import { BarChart3, TrendingUp, PieChart as PieIcon, Layers, CalendarRange, Coins } from "lucide-react";
 import { motion } from "motion/react";
 
 interface MonthlyChartsProps {
@@ -12,7 +12,10 @@ interface MonthlyChartsProps {
 const MONTHS_ORDER = ["FEBRUARI", "MARET", "APRIL", "MEI", "JUNI", "JULI", "AGUSTUS"];
 
 export default function MonthlyCharts({ filteredData }: MonthlyChartsProps) {
-  const [activeTab, setActiveTab] = useState<"trend" | "categories" | "status">("trend");
+  const [activeTab, setActiveTab] = useState<"trend" | "categories" | "status" | "financials">("trend");
+
+  // Filter out BATAL status from all calculations
+  const validData = filteredData.filter(item => String(item.status || "").toUpperCase() !== "BATAL");
 
   // 1. Process Monthly Trend Data
   const monthlyAggregates = MONTHS_ORDER.reduce((acc, month) => {
@@ -27,7 +30,7 @@ export default function MonthlyCharts({ filteredData }: MonthlyChartsProps) {
     return acc;
   }, {} as Record<string, any>);
 
-  filteredData.forEach(item => {
+  validData.forEach(item => {
     const month = (item.bln || "").toUpperCase();
     if (monthlyAggregates[month]) {
       monthlyAggregates[month]["Total BOQ"] += item.jumlah || 0;
@@ -54,11 +57,46 @@ export default function MonthlyCharts({ filteredData }: MonthlyChartsProps) {
     (m: any) => m["Total BOQ"] > 0 || m["Jumlah LOP"] > 0
   );
 
+  // Process financial chart data (BOQ, Material, Jasa, Panjar)
+  const financialMonthlyAggregates = MONTHS_ORDER.reduce((acc, month) => {
+    acc[month] = {
+      name: month,
+      "Total BOQ": 0,
+      "Nilai Material": 0,
+      "Operasional Jasa": 0,
+      "Pembayaran Panjar": 0
+    };
+    return acc;
+  }, {} as Record<string, any>);
+
+  validData.forEach(item => {
+    const month = (item.bln || "").toUpperCase();
+    if (financialMonthlyAggregates[month]) {
+      financialMonthlyAggregates[month]["Total BOQ"] += item.jumlah || 0;
+      financialMonthlyAggregates[month]["Nilai Material"] += item.material || 0;
+      financialMonthlyAggregates[month]["Operasional Jasa"] += item.jasa || 0;
+      financialMonthlyAggregates[month]["Pembayaran Panjar"] += item.panjar60 || 0;
+    } else if (month) {
+      financialMonthlyAggregates[month] = {
+        name: month,
+        "Total BOQ": item.jumlah || 0,
+        "Nilai Material": item.material || 0,
+        "Operasional Jasa": item.jasa || 0,
+        "Pembayaran Panjar": item.panjar60 || 0
+      };
+    }
+  });
+
+  const activeFinancialMonths = Object.values(financialMonthlyAggregates);
+  const financialChartData = activeFinancialMonths.filter(
+    (m: any) => m["Total BOQ"] > 0 || m["Pembayaran Panjar"] > 0
+  );
+
   // 2. Process Jenis & Pekerjaan Data
   const jenisAggregates: Record<string, number> = {};
   const pekerjaanAggregates: Record<string, number> = {};
 
-  filteredData.forEach(item => {
+  validData.forEach(item => {
     const j = item.jenis || "UNKNOWN";
     const p = item.pekerjaan || "UNKNOWN";
     jenisAggregates[j] = (jenisAggregates[j] || 0) + (item.jumlah || 0);
@@ -77,7 +115,7 @@ export default function MonthlyCharts({ filteredData }: MonthlyChartsProps) {
 
   // 3. Process Status Distribution
   const statusAggregates: Record<string, { count: number; value: number }> = {};
-  filteredData.forEach(item => {
+  validData.forEach(item => {
     const s = item.status || "TANPA STATUS";
     if (!statusAggregates[s]) {
       statusAggregates[s] = { count: 0, value: 0 };
@@ -175,12 +213,23 @@ export default function MonthlyCharts({ filteredData }: MonthlyChartsProps) {
             <PieIcon className="w-3.5 h-3.5" />
             Status Berkas
           </button>
+          <button
+            onClick={() => setActiveTab("financials")}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg transition-all duration-200 ${
+              activeTab === "financials"
+                ? "bg-white text-indigo-600 shadow-sm"
+                : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+            }`}
+          >
+            <Coins className="w-3.5 h-3.5" />
+            Pilar Finansial
+          </button>
         </div>
       </div>
 
       {/* Main Chart viewport */}
       <div className="min-h-[320px] relative w-full">
-        {filteredData.length === 0 ? (
+        {validData.length === 0 ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 text-sm">
             <CalendarRange className="w-12 h-12 stroke-1 mb-2 text-slate-300" />
             <span>Tidak ada data untuk divisualisasikan dengan filter aktif</span>
@@ -384,6 +433,76 @@ export default function MonthlyCharts({ filteredData }: MonthlyChartsProps) {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "financials" && (
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Pilar Keuangan Proyek: BOQ, Material, Jasa, & Progres Panjar
+                  </span>
+                  <span className="text-[10px] text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-100/50 font-bold uppercase shrink-0">
+                    Status Proyek Aktif (Khusus Selain Batal)
+                  </span>
+                </div>
+                
+                <div className="h-[300px] w-full mt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={financialChartData}
+                      margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis
+                        dataKey="name"
+                        stroke="#94a3b8"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        stroke="#94a3b8"
+                        fontSize={11}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(v) => formatCompactIDR(v)}
+                      />
+                      <Tooltip content={<CustomCurrencyTooltip />} />
+                      <Legend
+                        verticalAlign="top"
+                        height={36}
+                        iconType="circle"
+                        iconSize={8}
+                        wrapperStyle={{ fontSize: 11, fontWeight: 500, color: "#64748b" }}
+                      />
+                      <Bar dataKey="Total BOQ" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                      <Bar dataKey="Nilai Material" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                      <Bar dataKey="Operasional Jasa" fill="#8b5cf6" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                      <Bar dataKey="Pembayaran Panjar" name="Panjar / Penghasilan (60%)" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={20} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Sub-cards showing totals for these pillars */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-slate-100">
+                  <div className="p-3 bg-blue-50/50 rounded-xl border border-blue-100/30">
+                    <span className="text-[10px] uppercase font-bold text-blue-500 block mb-1">Total BOQ Selesai/Aktif</span>
+                    <span className="text-sm font-extrabold text-slate-800">{formatIDR(validData.reduce((sum, item) => sum + (item.jumlah || 0), 0))}</span>
+                  </div>
+                  <div className="p-3 bg-amber-50/50 rounded-xl border border-amber-100/30">
+                    <span className="text-[10px] uppercase font-bold text-amber-500 block mb-1">Total Komponen Material</span>
+                    <span className="text-sm font-extrabold text-slate-800">{formatIDR(validData.reduce((sum, item) => sum + (item.material || 0), 0))}</span>
+                  </div>
+                  <div className="p-3 bg-purple-50/50 rounded-xl border border-purple-100/30">
+                    <span className="text-[10px] uppercase font-bold text-purple-500 block mb-1">Total Operasional Jasa</span>
+                    <span className="text-sm font-extrabold text-slate-800">{formatIDR(validData.reduce((sum, item) => sum + (item.jasa || 0), 0))}</span>
+                  </div>
+                  <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100/30">
+                    <span className="text-[10px] uppercase font-bold text-emerald-500 block mb-1">Total Realisasi (60%)</span>
+                    <span className="text-sm font-extrabold text-slate-800">{formatIDR(validData.reduce((sum, item) => sum + (item.panjar60 || 0), 0))}</span>
                   </div>
                 </div>
               </div>

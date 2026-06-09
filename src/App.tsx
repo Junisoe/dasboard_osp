@@ -25,20 +25,22 @@ export default function App() {
     }
     // Enforce business rules:
     // 1. Nilai Total BOQ (jumlah) adalah hasil penjumlahan Material + Jasa
-    // 2. Status Finansial & Pembagian Milestone hanya berlaku di pekerjaan MHR
+    // 2. Pembagian Milestone 60% berlaku untuk pekerjaan MHR, DKU, dan TA. Sisa milestone lainnya khusus MHR.
     return rawList.map((item, idx) => {
       const pekerjaan = String(item.pekerjaan || "DKU").toUpperCase();
       const isMhr = pekerjaan === "MHR";
+      const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
       const material = Number(item.material) || 0;
       const jasa = Number(item.jasa) || 0;
       const jumlah = material + jasa;
+      const isMilestoneEligible = isMhr || isDkuOrTa;
       return {
         ...item,
         id: item.id || String(idx + 1),
         material,
         jasa,
         jumlah,
-        panjar60: isMhr ? (Number(item.panjar60) || Math.round(jumlah * 0.60)) : 0,
+        panjar60: isMilestoneEligible ? (Number(item.panjar60) || Math.round(jumlah * 0.60)) : 0,
         panjarSitac: isMhr ? (Number(item.panjarSitac) || 0) : 0,
         pelunasan15: isMhr ? (Number(item.pelunasan15) || Math.round(jumlah * 0.15)) : 0,
         pendapatanMaharani: isMhr ? (Number(item.pendapatanMaharani) || Math.round(jumlah * 0.25)) : 0,
@@ -149,10 +151,12 @@ export default function App() {
           const mappedProjects: ProjectData[] = parsedRows.map((row, idx) => {
             const pekerjaan = String(row.pekerjaan || "DKU").toUpperCase();
             const isMhr = pekerjaan === "MHR";
+            const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
             const material = Number(row.material) || 0;
             const jasa = Number(row.jasa) || 0;
             const sitac = Number(row.sitac) || 0;
             const jumlah = material + jasa;
+            const isMilestoneEligible = isMhr || isDkuOrTa;
             return {
               id: row.id || String(idx + 1),
               bln: String(row.bln || "MEI").toUpperCase(),
@@ -165,7 +169,7 @@ export default function App() {
               jasa: jasa,
               sitac: sitac,
               jumlah: jumlah,
-              panjar60: isMhr ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
+              panjar60: isMilestoneEligible ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
               panjarSitac: isMhr ? (Number(row.panjarSitac) || sitac) : 0,
               pelunasan15: isMhr ? (Number(row.pelunasan15) || Math.round(jumlah * 0.15)) : 0,
               pendapatanMaharani: isMhr ? (Number(row.pendapatanMaharani) || Math.round(jumlah * 0.25)) : 0,
@@ -216,10 +220,12 @@ export default function App() {
       const mappedProjects: ProjectData[] = incomingData.map((row, idx) => {
         const pekerjaan = String(row.pekerjaan || "DKU").toUpperCase();
         const isMhr = pekerjaan === "MHR";
+        const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
         const material = Number(row.material) || 0;
         const jasa = Number(row.jasa) || 0;
         const sitac = Number(row.sitac) || 0;
         const jumlah = material + jasa;
+        const isMilestoneEligible = isMhr || isDkuOrTa;
         return {
           id: row.id || String(idx + 1),
           bln: String(row.bln || "MEI").toUpperCase(),
@@ -232,7 +238,7 @@ export default function App() {
           jasa: jasa,
           sitac: sitac,
           jumlah: jumlah,
-          panjar60: isMhr ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
+          panjar60: isMilestoneEligible ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
           panjarSitac: isMhr ? (Number(row.panjarSitac) || sitac) : 0,
           pelunasan15: isMhr ? (Number(row.pelunasan15) || Math.round(jumlah * 0.15)) : 0,
           pendapatanMaharani: isMhr ? (Number(row.pendapatanMaharani) || Math.round(jumlah * 0.25)) : 0,
@@ -273,16 +279,18 @@ export default function App() {
     setData(INITIAL_MOCK_DATA.map((row, idx) => {
       const pekerjaan = String(row.pekerjaan || "DKU").toUpperCase();
       const isMhr = pekerjaan === "MHR";
+      const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
       const material = Number(row.material) || 0;
       const jasa = Number(row.jasa) || 0;
       const jumlah = material + jasa;
+      const isMilestoneEligible = isMhr || isDkuOrTa;
       return {
         ...row,
         id: row.id || String(idx + 1),
         material,
         jasa,
         jumlah,
-        panjar60: isMhr ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
+        panjar60: isMilestoneEligible ? (Number(row.panjar60) || Math.round(jumlah * 0.60)) : 0,
         panjarSitac: isMhr ? (Number(row.panjarSitac) || 0) : 0,
         pelunasan15: isMhr ? (Number(row.pelunasan15) || Math.round(jumlah * 0.15)) : 0,
         pendapatanMaharani: isMhr ? (Number(row.pendapatanMaharani) || Math.round(jumlah * 0.25)) : 0,
@@ -304,10 +312,12 @@ export default function App() {
   const handleAddSimulatedRow = (newRow: Omit<ProjectData, "id">) => {
     const pekerjaan = String(newRow.pekerjaan || "DKU").toUpperCase();
     const isMhr = pekerjaan === "MHR";
+    const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
     const material = Number(newRow.material) || 0;
     const jasa = Number(newRow.jasa) || 0;
     const sitac = Number(newRow.sitac) || 0;
     const jumlah = material + jasa; // Total BOQ: Material + Jasa
+    const isMilestoneEligible = isMhr || isDkuOrTa;
 
     const freshRow: ProjectData = {
       ...newRow,
@@ -316,7 +326,7 @@ export default function App() {
       jasa,
       sitac,
       jumlah,
-      panjar60: isMhr ? Math.round(jumlah * 0.60) : 0,
+      panjar60: isMilestoneEligible ? Math.round(jumlah * 0.60) : 0,
       panjarSitac: isMhr ? sitac : 0,
       pelunasan15: isMhr ? Math.round(jumlah * 0.15) : 0,
       pendapatanMaharani: isMhr ? Math.round(jumlah * 0.25) : 0,

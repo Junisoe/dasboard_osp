@@ -136,7 +136,9 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
     e.preventDefault();
     if (!newRow.namaLop.trim()) return;
 
-    const isMhr = String(newRow.pekerjaan).toUpperCase() === "MHR";
+    const pekerjaan = String(newRow.pekerjaan).toUpperCase();
+    const isMhr = pekerjaan === "MHR";
+    const isDkuOrTa = pekerjaan === "DKU" || pekerjaan === "TA";
     const baseAmount = Number(newRow.material) + Number(newRow.jasa); // Total BOQ: Material + Jasa
     const sitacVal = Number(newRow.sitac);
     const resolvedRow = {
@@ -145,7 +147,7 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
       jasa: Number(newRow.jasa),
       sitac: sitacVal,
       jumlah: baseAmount,
-      panjar60: isMhr ? Math.round(baseAmount * 0.60) : 0,
+      panjar60: (isMhr || isDkuOrTa) ? Math.round(baseAmount * 0.60) : 0,
       panjarSitac: isMhr ? sitacVal : 0,
       pelunasan15: isMhr ? Math.round(baseAmount * 0.15) : 0,
       pendapatanMaharani: isMhr ? Math.round(baseAmount * 0.25) : 0
@@ -185,6 +187,8 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
         return "bg-amber-50 text-amber-700 border-amber-100 hover:bg-amber-100/50";
       case "PLAN":
         return "bg-slate-50 text-slate-600 border-slate-100 hover:bg-slate-100/50";
+      case "BATAL":
+        return "bg-rose-50 text-rose-700 border-rose-100 hover:bg-rose-100/50";
       default:
         return "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100";
     }
@@ -593,7 +597,7 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
                       value={newRow.status}
                       onChange={(e) => setNewRow({ ...newRow, status: e.target.value })}
                     >
-                      {["BERKAS DONE", "PENGAJUAN REKON", "PEMBERKASAN", "PLAN"].map(s => (
+                      {["BERKAS DONE", "PENGAJUAN REKON", "PEMBERKASAN", "PLAN", "BATAL"].map(s => (
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
