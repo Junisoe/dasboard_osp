@@ -7,7 +7,9 @@ import StatusPipeline from "./components/StatusPipeline";
 import MonthlyCharts from "./components/MonthlyCharts";
 import ProjectTable from "./components/ProjectTable";
 import DesignatorDetailModal from "./components/DesignatorDetailModal";
-import { LayoutDashboard, CloudLightning, FileSpreadsheet, RefreshCw, Layers, CheckCircle2 } from "lucide-react";
+import CashFlowSimulator from "./components/CashFlowSimulator";
+import ExecutiveSummary from "./components/ExecutiveSummary";
+import { LayoutDashboard, CloudLightning, FileSpreadsheet, RefreshCw, Layers, CheckCircle2, Tv, Sparkles, TrendingUp, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { parseCSVDirect, transformCSVRowsDirect } from "./utils/sheetParser";
 
@@ -78,6 +80,10 @@ export default function App() {
   const [syncSuccess, setSyncSuccess] = useState(false);
   const [showConfig, setShowConfig] = useState<boolean>(false);
   const [selectedProject, setSelectedProject] = useState<ProjectData | null>(null);
+  
+  const [isZenMode, setIsZenMode] = useState<boolean>(false);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState<boolean>(false);
+  const [isAIExtendedOpen, setIsAIExtendedOpen] = useState<boolean>(false);
 
   // Synchronize Google Sheets data trigger
   const handleConnectSheet = async (url: string): Promise<boolean> => {
@@ -394,64 +400,117 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 text-slate-800 font-sans selection:bg-indigo-500 selection:text-white">
-      {/* Top Header Navigation bar */}
-      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-sm flex items-center justify-center">
-              <LayoutDashboard className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="font-extrabold text-slate-900 tracking-tight text-base sm:text-lg block leading-none">
-                PROYEKMON
-              </span>
-              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mt-0.5">
-                Dashboard Monitoring Real-Time
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            {isLive ? (
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-xs font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="hidden xs:inline">Google Sheet Tersambung</span>
-                <span className="xs:hidden">Tersambung</span>
+    <div className={`min-h-screen bg-slate-50/50 text-slate-800 font-sans selection:bg-indigo-500 selection:text-white transition-all ${isZenMode ? 'p-0' : ''}`}>
+      {/* Top Header Navigation bar (hidden in Zen/Presentation Mode) */}
+      {!isZenMode && (
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-slate-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-600 rounded-xl text-white shadow-sm flex items-center justify-center">
+                <LayoutDashboard className="w-5 h-5" />
               </div>
-            ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-xs font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                <span>Simulasi Mode</span>
+              <div>
+                <span className="font-extrabold text-slate-900 tracking-tight text-base sm:text-lg block leading-none">
+                  PROYEKMON
+                </span>
+                <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider block mt-0.5">
+                  Dashboard Monitoring Real-Time
+                </span>
               </div>
-            )}
+            </div>
 
-            {isLive && apiUrl && (
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Quick Simulator Launcher */}
               <button
-                onClick={() => handleConnectSheet(apiUrl)}
-                disabled={isLoading}
-                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition duration-150 disabled:opacity-40"
-                title="Sinkronkan Data Ulang"
+                onClick={() => setIsSimulatorOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-750 text-xs font-bold rounded-xl transition duration-150 border border-indigo-100 cursor-pointer shadow-xs"
+                title="Mulai Simulator Target Keuangan"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Simulator Target</span>
               </button>
-            )}
 
-            <button
-              onClick={() => setShowConfig((prev) => !prev)}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition duration-150 shadow-xs cursor-pointer border ${
-                showConfig
-                  ? "bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-              title="Atur Koneksi Google Sheet"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{showConfig ? "Tutup Koneksi" : "Koneksi Google Sheet"}</span>
-            </button>
+              {/* Quick AI Report Summary Launcher */}
+              <button
+                onClick={() => setIsAIExtendedOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-705 text-xs font-bold rounded-xl transition duration-150 border border-purple-100 cursor-pointer shadow-xs"
+                title="Mulai Laporan Ringkasan AI"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-purple-500" />
+                <span className="hidden md:inline">Ringkasan AI</span>
+              </button>
+
+              {/* Zen Kiosk Mode Toggle */}
+              <button
+                onClick={() => {
+                  setIsZenMode(true);
+                  setShowConfig(false);
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-705 text-xs font-bold rounded-xl transition duration-150 border border-slate-205 cursor-pointer shadow-xs"
+                title="Masuk Mode Presentasi Bersih (Kiosk Mode)"
+              >
+                <Tv className="w-3.5 h-3.5 text-slate-500" />
+                <span className="hidden md:inline">Mode Presentasi</span>
+              </button>
+
+              {isLive ? (
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-full text-xs font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="hidden xs:inline">Google Sheet Tersambung</span>
+                  <span className="xs:hidden">Tersambung</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-100 rounded-full text-xs font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                  <span>Simulasi Mode</span>
+                </div>
+              )}
+
+              {isLive && apiUrl && (
+                <button
+                  onClick={() => handleConnectSheet(apiUrl)}
+                  disabled={isLoading}
+                  className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition duration-150 disabled:opacity-40 cursor-pointer"
+                  title="Sinkronkan Data Ulang"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                </button>
+              )}
+
+              <button
+                onClick={() => setShowConfig((prev) => !prev)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition duration-150 shadow-xs cursor-pointer border ${
+                  showConfig
+                    ? "bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
+                title="Atur Koneksi Google Sheet"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{showConfig ? "Tutup Koneksi" : "Koneksi Google Sheet"}</span>
+              </button>
+            </div>
           </div>
+        </header>
+      )}
+
+      {/* Floating Presentation exit badge (only visible during Zen/Kiosk Mode) */}
+      {isZenMode && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+          <div className="flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 border border-indigo-700 text-white rounded-full text-xs font-extrabold shadow-lg shadow-indigo-500/10">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span>Mode Presentasi Aktif</span>
+          </div>
+          <button
+            onClick={() => setIsZenMode(false)}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-white font-extrabold text-xs rounded-full transition duration-150 cursor-pointer shadow-lg hover:scale-105"
+            title="Keluar dari Kiosk Presentation Mode"
+          >
+            <Tv className="w-3.5 h-3.5 text-slate-350" />
+            <span>Keluar Mode Zen</span>
+          </button>
         </div>
-      </header>
+      )}
 
       {/* Main Container Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -467,21 +526,42 @@ export default function App() {
             </p>
           </div>
 
-          {syncSuccess && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-bold shadow-sm"
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Quick Actions Panel */}
+            <button
+              onClick={() => setIsSimulatorOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-extrabold rounded-xl transition duration-150 shadow-sm cursor-pointer hover:scale-[1.02]"
+              title="Mulai Simulator Target Keuangan"
             >
-              <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
-              <span>Data Berhasil Disinkronkan!</span>
-            </motion.div>
-          )}
+              <TrendingUp className="w-4 h-4" />
+              <span>Simulator Target</span>
+            </button>
+            
+            <button
+              onClick={() => setIsAIExtendedOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-extrabold rounded-xl transition duration-150 shadow-sm cursor-pointer hover:scale-[1.02]"
+              title="Mulai Ringkasan Laporan AI"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Analisis Laporan AI</span>
+            </button>
+
+            {syncSuccess && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-800 text-xs font-bold shadow-sm"
+              >
+                <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+                <span>Data Berhasil Disinkronkan!</span>
+              </motion.div>
+            )}
+          </div>
         </div>
 
         {/* 1. Google Sheets Connection Panel */}
         <AnimatePresence>
-          {showConfig && (
+          {showConfig && !isZenMode && (
             <motion.div
               initial={{ opacity: 0, height: 0, scale: 0.98, marginBottom: 0 }}
               animate={{ opacity: 1, height: "auto", scale: 1, marginBottom: 24 }}
@@ -520,6 +600,7 @@ export default function App() {
             data={data} 
             onAddRow={handleAddSimulatedRow} 
             onLopClick={(item) => setSelectedProject(item)} 
+            isZenMode={isZenMode}
           />
         </div>
 
@@ -543,6 +624,20 @@ export default function App() {
           />
         )}
       </AnimatePresence>
+
+      {/* Financial Target Simulator Drawer overlay */}
+      <CashFlowSimulator
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+        projects={data}
+      />
+
+      {/* AI Executive Summary modal overlay */}
+      <ExecutiveSummary
+        isOpen={isAIExtendedOpen}
+        onClose={() => setIsAIExtendedOpen(false)}
+        projects={data}
+      />
     </div>
   );
 }

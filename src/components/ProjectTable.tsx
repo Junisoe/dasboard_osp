@@ -8,12 +8,13 @@ interface ProjectTableProps {
   data: ProjectData[];
   onAddRow?: (newRow: Omit<ProjectData, "id">) => void;
   onLopClick?: (lopItem: ProjectData) => void;
+  isZenMode?: boolean;
 }
 
 type SortField = "bln" | "jenis" | "pekerjaan" | "boq" | "status" | "namaLop" | "jumlah";
 type SortOrder = "asc" | "desc";
 
-export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTableProps) {
+export default function ProjectTable({ data, onAddRow, onLopClick, isZenMode = false }: ProjectTableProps) {
   // Search and main filters
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBln, setSelectedBln] = useState<string>("");
@@ -21,6 +22,7 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
   const [selectedPekerjaan, setSelectedPekerjaan] = useState<string>("");
   const [selectedStatus, setSelectedStatus] = useState<string>("");
   const [selectedBoq, setSelectedBoq] = useState<string>("");
+  const [selectedCashStage, setSelectedCashStage] = useState<string>("");
 
   // Table sorting & pagination
   const [sortField, setSortField] = useState<SortField>("bln");
@@ -63,6 +65,7 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
     setSelectedPekerjaan("");
     setSelectedStatus("");
     setSelectedBoq("");
+    setSelectedCashStage("");
     setCurrentPage(1);
   };
 
@@ -83,7 +86,7 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
     // Search by LOP Name
     if (searchTerm.trim() !== "") {
       result = result.filter(item =>
-        item.namaLop.toLowerCase().includes(searchTerm.toLowerCase())
+         item.namaLop.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -104,6 +107,21 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
       result = result.filter(item => item.boq === selectedBoq);
     }
 
+    // Cash Stage Quick Filters
+    if (selectedCashStage === "SIAP_TAGIH_100") {
+      // 🟢 Siap Tagih 100% (Khusus DKU OSP)
+      result = result.filter(item => String(item.pekerjaan).toUpperCase() === "DKU OSP");
+    } else if (selectedCashStage === "PANJAR_60") {
+      // 🔵 Jatuh Tempo Panjar 60% (DKU QE, TA, MHR)
+      result = result.filter(item => {
+        const pk = String(item.pekerjaan).toUpperCase();
+        return pk === "DKU QE" || pk === "DKU" || pk === "TA" || pk === "MHR";
+      });
+    } else if (selectedCashStage === "RETENSI_15") {
+      // 🟡 Kategori Retensi Pelunasan 15% (Khusus MHR)
+      result = result.filter(item => String(item.pekerjaan).toUpperCase() === "MHR");
+    }
+
     // Apply Sorting
     result.sort((a, b) => {
       let valA = a[sortField];
@@ -121,7 +139,7 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
     });
 
     return result;
-  }, [data, searchTerm, selectedBln, selectedJenis, selectedPekerjaan, selectedStatus, selectedBoq, sortField, sortOrder]);
+  }, [data, searchTerm, selectedBln, selectedJenis, selectedPekerjaan, selectedStatus, selectedBoq, selectedCashStage, sortField, sortOrder]);
 
   // Paginated dataset
   const paginatedData = useMemo(() => {
@@ -252,12 +270,69 @@ export default function ProjectTable({ data, onAddRow, onLopClick }: ProjectTabl
             </button>
           )}
           
+          {!isZenMode && (
+            <button
+              onClick={() => setIsAdding(true)}
+              className="flex items-center gap-1.5 px-4.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all duration-200 hover:shadow"
+            >
+              <Plus className="w-4 h-4" />
+              Tambah Data LOP
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Advanced Cash-Stage Filters (Filter Tahap Pembayaran) */}
+      <div className="px-5 py-3.5 bg-slate-50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+        <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest block shrink-0 sm:mt-0.5">
+          Filter Tahap Tagihan:
+        </span>
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
-            onClick={() => setIsAdding(true)}
-            className="flex items-center gap-1.5 px-4.5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all duration-200 hover:shadow"
+            onClick={() => { setSelectedCashStage(""); setCurrentPage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
+              selectedCashStage === ""
+                ? "bg-slate-800 text-white shadow-xs"
+                : "bg-white hover:bg-slate-100 text-slate-650 border border-slate-205"
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            Tambah Data LOP
+            Semua LOP
+          </button>
+          
+          <button
+            onClick={() => { setSelectedCashStage("SIAP_TAGIH_100"); setCurrentPage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
+              selectedCashStage === "SIAP_TAGIH_100"
+                ? "bg-emerald-600 text-white shadow-xs"
+                : "bg-emerald-50/50 hover:bg-emerald-100 text-emerald-700 border border-emerald-100"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${selectedCashStage === "SIAP_TAGIH_100" ? "bg-white" : "bg-emerald-500"}`} />
+            Siap Tagih 100% (DKU OSP)
+          </button>
+          
+          <button
+            onClick={() => { setSelectedCashStage("PANJAR_60"); setCurrentPage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
+              selectedCashStage === "PANJAR_60"
+                ? "bg-blue-600 text-white shadow-xs"
+                : "bg-blue-50/50 hover:bg-blue-100 text-blue-700 border border-blue-100"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${selectedCashStage === "PANJAR_60" ? "bg-white" : "bg-blue-500"}`} />
+            Panjar 60% (DKU, TA, MHR)
+          </button>
+          
+          <button
+            onClick={() => { setSelectedCashStage("RETENSI_15"); setCurrentPage(1); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all duration-150 flex items-center gap-1.5 cursor-pointer ${
+              selectedCashStage === "RETENSI_15"
+                ? "bg-amber-500 text-white shadow-xs"
+                : "bg-amber-50/50 hover:bg-amber-100 text-amber-700 border border-amber-100"
+            }`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${selectedCashStage === "RETENSI_15" ? "bg-white" : "bg-amber-500"}`} />
+            Retensi Pelunasan 15% (MHR)
           </button>
         </div>
       </div>
